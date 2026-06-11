@@ -2,7 +2,7 @@
 
 A self-hosted applicant tracking system that parses resumes and job descriptions, scores candidates against open roles, and surfaces ranked results through a web UI — all running locally with no cloud dependency at runtime.
 
-> **Context:** This project was developed during an internship at [Groz-Beckert](https://www.groz-beckert.com), a German precision parts manufacturer. The Groz branding visible in the UI (logo, orange accent colour) reflects that origin. The codebase is shared publicly as a portfolio piece and as a reference for others building similar tools.
+> **Context:** This project was developed during an internship at [Groz-Engineering-Tools], a tools manufacturer. The Groz branding visible in the UI (logo, orange accent colour) reflects that origin. The codebase is shared publicly as a portfolio piece and as a reference for others building similar tools.
 
 ---
 
