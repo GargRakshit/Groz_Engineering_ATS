@@ -1,0 +1,1577 @@
+<!DOCTYPE html>
+<html lang="en" data-theme="light">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Application Tracking System</title>
+  <script>(function(){var t=localStorage.getItem('rp-theme')||'light';document.documentElement.setAttribute('data-theme',t);})()</script>
+  <style>
+    :root {
+      --bg:            #f4f4f4;
+      --surface:       #ffffff;
+      --surface-alt:   #f9f9f9;
+      --border:        #e0e0e0;
+      --border-subtle: #ebebeb;
+      --text-1:        #1a1a1a;
+      --text-2:        #666666;
+      --text-name:     #f47920;
+      --accent:        #f47920;
+      --accent-h:      #d46010;
+      --accent-soft:   #fff3ea;
+      --nav-bg:        #000000;
+      --nav-text:      #f0ece6;
+      --input-bg:      #ffffff;
+      --input-border:  #d0d0d0;
+      --vbtn-border:   #d0d0d0;
+      --vbtn-bg:       #ffffff;
+      --vbtn-text:     #555555;
+      --score-color:   #1a1a1a;
+      --card-shadow:   0 1px 3px rgba(0,0,0,.08);
+      --filter-bg:     #ffffff;
+      --filter-border: #e0e0e0;
+      --footer-bg:     #f4f4f4;
+      --upload-bg:     #ffffff;
+      --viewer-bg:     #ffffff;
+      --vhdr-border:   #e0e0e0;
+      --ok-bg:    #edfbea; --ok-text:   #2a7a2a;
+      --warn-bg:  #fff8e1; --warn-text: #a05c00;
+      --err-bg:   #fdecea; --err-text:  #b71c1c;
+      --selected-bg:   #fff3ea;
+      --sl-bg: #fff3ea; --sl-text: #b85000; --sl-border: rgba(244,121,32,0.5);
+    }
+    [data-theme="dark"] {
+      --bg:            #000000;
+      --surface:       #181818;
+      --surface-alt:   #181818;
+      --border:        #2a2a2a;
+      --border-subtle: #1e1e1e;
+      --text-1:        #f0ece6;
+      --text-2:        #9a9089;
+      --text-name:     #f47920;
+      --accent:        #f47920;
+      --accent-h:      #d46010;
+      --accent-soft:   #1a0e05;
+      --nav-bg:        #000000;
+      --nav-text:      #f0ece6;
+      --input-bg:      #181818;
+      --input-border:  #2a2a2a;
+      --vbtn-border:   #2a2a2a;
+      --vbtn-bg:       transparent;
+      --vbtn-text:     #9a9089;
+      --score-color:   #f0ece6;
+      --card-shadow:   none;
+      --filter-bg:     #000000;
+      --filter-border: #2a2a2a;
+      --footer-bg:     #000000;
+      --upload-bg:     #181818;
+      --viewer-bg:     #181818;
+      --vhdr-border:   #2a2a2a;
+      --ok-bg:    #0d1a08; --ok-text:   #6ee880;
+      --warn-bg:  #1a1200; --warn-text: #ffc96e;
+      --err-bg:   #1a0600; --err-text:  #ff8c8c;
+      --selected-bg:   #1e1207;
+      --sl-bg: #1a0e05; --sl-text: #ffb46c; --sl-border: rgba(244,121,32,0.6);
+    }
+
+    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+    body {
+      font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", system-ui, sans-serif;
+      background: var(--bg);
+      color: var(--text-1);
+      height: 100vh;
+      display: flex;
+      flex-direction: column;
+    }
+
+    /* ── Header ── */
+    .header {
+      background: var(--nav-bg);
+      color: var(--nav-text);
+      min-height: 58px;
+      padding: 0 1.25rem;
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      flex-shrink: 0;
+      gap: 0.75rem;
+      border-bottom: 1px solid #1a1a1a;
+    }
+    .header-left { display: flex; align-items: center; gap: 0.6rem; }
+    .brand-logo {
+      display: flex;
+      align-items: center;
+      flex-shrink: 0;
+    }
+    .brand-logo img {
+      display: block;
+      width: 200px;
+      height: auto;
+    }
+    .brand-title {
+      font-weight: 700;
+      font-size: 0.95rem;
+      color: var(--nav-text);
+      letter-spacing: -0.01em;
+    }
+    .header-right { display: flex; align-items: center; gap: 0.5rem; }
+
+    .theme-btn {
+      width: 32px; height: 32px;
+      border-radius: 7px;
+      border: 1px solid rgba(244,121,32,0.28);
+      background: rgba(244,121,32,0.08);
+      color: var(--nav-text);
+      cursor: pointer;
+      display: flex; align-items: center; justify-content: center;
+      transition: background 0.15s, border-color 0.15s;
+      flex-shrink: 0;
+    }
+    .theme-btn:hover { background: rgba(244,121,32,0.18); border-color: rgba(244,121,32,.45); }
+    .icon-moon { display: flex; }
+    .icon-sun  { display: none; }
+    [data-theme="dark"] .icon-moon { display: none; }
+    [data-theme="dark"] .icon-sun  { display: flex; }
+
+    .btn {
+      background: linear-gradient(135deg, var(--accent), var(--accent-h));
+      color: #111111;
+      border: none;
+      padding: 0 0.9rem;
+      height: 32px;
+      border-radius: 7px;
+      font-size: 0.82rem;
+      font-weight: 600;
+      cursor: pointer;
+      font-family: inherit;
+      display: inline-flex;
+      align-items: center;
+      gap: 0.3rem;
+      transition: background 0.15s;
+      white-space: nowrap;
+    }
+    .btn:hover     { background: linear-gradient(135deg, var(--accent-h), #b94c00); }
+    .btn:disabled  { opacity: 0.55; cursor: not-allowed; }
+
+    /* ── Filters ── */
+    .filters {
+      background: var(--filter-bg);
+      border-bottom: 1px solid var(--filter-border);
+      padding: 0.5rem 1.25rem;
+      display: flex;
+      align-items: center;
+      gap: 0.45rem;
+      flex-wrap: wrap;
+      flex-shrink: 0;
+    }
+    .filters input, .filters select {
+      background: var(--input-bg);
+      border: 1px solid var(--input-border);
+      border-radius: 7px;
+      font-size: 0.81rem;
+      font-family: inherit;
+      color: var(--text-1);
+      padding: 0.35rem 0.6rem;
+      height: 30px;
+    }
+    .filters input::placeholder { color: var(--text-2); }
+    .filters input:focus, .filters select:focus {
+      outline: 2px solid var(--accent);
+      border-color: transparent;
+    }
+    .search-wrap { position: relative; flex: 1; min-width: 180px; }
+    .search-icon {
+      position: absolute;
+      left: 0.55rem;
+      top: 50%;
+      transform: translateY(-50%);
+      color: var(--text-2);
+      pointer-events: none;
+      display: flex;
+      align-items: center;
+    }
+    #q { padding-left: 1.85rem; width: 100%; }
+    #jd-filter  { min-width: 150px; }
+    #min-score  { width: 52px; }
+    #min-years  { width: 52px; }
+    #sort-by    { min-width: 118px; }
+    .filter-label { font-size: 0.76rem; color: var(--text-2); white-space: nowrap; }
+    .btn-clear-filters {
+      display: inline-flex; align-items: center; gap: 0.3rem;
+      height: 30px; padding: 0 0.65rem;
+      font-size: 0.78rem; font-weight: 500; font-family: inherit;
+      background: transparent; color: var(--text-2);
+      border: 1px solid var(--input-border); border-radius: 7px;
+      cursor: pointer; white-space: nowrap; transition: color 0.12s, border-color 0.12s;
+    }
+    .btn-clear-filters:hover { color: var(--text-1); border-color: var(--text-2); }
+
+    /* ── List ── */
+    .list-area {
+      flex: 1;
+      overflow-y: auto;
+      padding: 0.8rem 1.25rem;
+      display: flex;
+      flex-direction: column;
+      gap: 0.4rem;
+    }
+    .cand-card {
+      background: var(--surface);
+      border-radius: 10px;
+      padding: 0.85rem 1rem;
+      display: flex;
+      align-items: center;
+      gap: 0.85rem;
+      box-shadow: var(--card-shadow);
+      border: 1px solid transparent;
+      transition: border-color 0.15s;
+    }
+    .cand-card:hover { border-color: var(--border); }
+    .cand-card.hidden { display: none; }
+
+    .avatar {
+      width: 40px; height: 40px;
+      border-radius: 50%;
+      display: flex; align-items: center; justify-content: center;
+      font-size: 0.82rem; font-weight: 700;
+      flex-shrink: 0;
+      user-select: none;
+      letter-spacing: 0.02em;
+    }
+
+    .cand-body { flex: 1; min-width: 0; }
+    .cand-name a {
+      font-weight: 700;
+      font-size: 0.94rem;
+      color: var(--text-name);
+      text-decoration: none;
+    }
+    .cand-name a:hover { text-decoration: underline; }
+    .cand-meta {
+      font-size: 0.76rem;
+      color: var(--text-2);
+      margin-top: 0.12rem;
+      display: flex;
+      flex-wrap: wrap;
+      align-items: center;
+      gap: 0 0.35rem;
+    }
+    .meta-sep { color: var(--border); margin: 0 0.1rem; }
+    .cand-skills {
+      font-size: 0.73rem;
+      color: var(--text-2);
+      margin-top: 0.18rem;
+    }
+
+    .cand-aside {
+      display: flex;
+      flex-direction: column;
+      align-items: flex-end;
+      gap: 0.4rem;
+      flex-shrink: 0;
+    }
+    .score-val {
+      font-size: 0.9rem;
+      font-weight: 700;
+      color: var(--score-color);
+      white-space: nowrap;
+    }
+    #list-area.no-score .score-val { display: none; }
+
+    .btn-view {
+      display: inline-flex;
+      align-items: center;
+      gap: 0.28rem;
+      padding: 0.28rem 0.65rem;
+      font-size: 0.74rem;
+      font-weight: 500;
+      border: 1px solid var(--vbtn-border);
+      border-radius: 6px;
+      background: var(--vbtn-bg);
+      color: var(--vbtn-text);
+      cursor: pointer;
+      font-family: inherit;
+      white-space: nowrap;
+      transition: border-color 0.12s, color 0.12s, background 0.12s;
+    }
+    .btn-view:hover {
+      border-color: var(--accent);
+      color: var(--accent);
+      background: var(--accent-soft);
+    }
+    [data-theme="dark"] .btn-view:hover {
+      background: rgba(244,121,32,0.12);
+    }
+
+    /* ── Status select ── */
+    .status-select {
+      -webkit-appearance: none;
+      appearance: none;
+      border: 1px solid var(--input-border);
+      border-radius: 20px;
+      font-size: 0.71rem;
+      font-weight: 500;
+      font-family: inherit;
+      padding: 0.18rem 0.55rem;
+      cursor: pointer;
+      background: transparent;
+      color: var(--text-2);
+      white-space: nowrap;
+      max-width: 105px;
+    }
+    .status-select:focus { outline: none; }
+    .status-select.status-shortlisted { background: var(--sl-bg);   color: var(--sl-text);   border-color: var(--sl-border); }
+    .status-select.status-interviewed { background: var(--warn-bg); color: var(--warn-text); border-color: var(--warn-text); }
+    .status-select.status-selected    { background: var(--ok-bg);   color: var(--ok-text);   border-color: var(--ok-text);   }
+    .status-select.status-rejected    { background: var(--err-bg);  color: var(--err-text);  border-color: var(--err-text);  }
+
+    /* ── Footer ── */
+    .footer {
+      background: var(--footer-bg);
+      border-top: 1px solid var(--filter-border);
+      padding: 0.4rem 1.25rem;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      gap: 0.35rem;
+      font-size: 0.76rem;
+      color: var(--text-2);
+      flex-shrink: 0;
+    }
+
+    /* No spinners on number inputs */
+    input[type=number]::-webkit-inner-spin-button,
+    input[type=number]::-webkit-outer-spin-button { -webkit-appearance: none; margin: 0; }
+    input[type=number] { appearance: textfield; }
+
+    /* Select-all checkbox in filter bar */
+    .sel-all-wrap {
+      display: flex; align-items: center; flex-shrink: 0; cursor: pointer;
+    }
+    .sel-all-wrap input[type="checkbox"] {
+      width: 15px; height: 15px; cursor: pointer; accent-color: var(--accent);
+    }
+
+    /* Outlined button (Add JD) */
+    .btn-outline {
+      background: transparent;
+      border: 1px solid rgba(244,121,32,0.32);
+      color: var(--nav-text);
+      height: 32px; padding: 0 0.9rem;
+      border-radius: 7px; font-size: 0.82rem; font-weight: 600;
+      cursor: pointer; font-family: inherit;
+      display: inline-flex; align-items: center; gap: 0.3rem;
+      transition: background 0.15s;
+      white-space: nowrap;
+    }
+    .btn-outline:hover { background: rgba(244,121,32,0.12); }
+
+    /* Logout button */
+    .btn-logout {
+      background: transparent;
+      border: 1px solid rgba(244,121,32,0.28);
+      color: rgba(255,255,255,0.72);
+      height: 32px; padding: 0 0.85rem;
+      border-radius: 7px; font-size: 0.82rem; font-weight: 500;
+      cursor: pointer; font-family: inherit;
+      display: inline-flex; align-items: center; gap: 0.3rem;
+      transition: background 0.15s, color 0.15s, border-color 0.15s;
+      white-space: nowrap; text-decoration: none;
+    }
+    .btn-logout:hover { background: rgba(244,121,32,0.14); color: #fff; border-color: rgba(244,121,32,0.5); }
+
+    /* Re-score button in select bar */
+    .btn-rescore {
+      display: inline-flex; align-items: center; gap: 0.3rem;
+      padding: 0.32rem 0.75rem; font-size: 0.79rem; font-weight: 600;
+      background: linear-gradient(135deg, var(--accent), var(--accent-h)); color: #111111; border: none;
+      border-radius: 6px; cursor: pointer; font-family: inherit;
+      transition: background 0.12s;
+    }
+    .btn-rescore:hover:not(:disabled) { background: linear-gradient(135deg, var(--accent-h), #b94c00); }
+    .btn-rescore:disabled { opacity: 0.4; cursor: not-allowed; }
+
+    /* Select bar (shown when cards are checked) */
+    .select-bar {
+      background: var(--filter-bg);
+      border-bottom: 1px solid var(--filter-border);
+      padding: 0.38rem 1.25rem;
+      display: none;
+      align-items: center;
+      gap: 0.6rem;
+      flex-shrink: 0;
+      font-size: 0.8rem;
+      color: var(--text-2);
+    }
+    .select-bar.open { display: flex; }
+    .sel-count { font-weight: 600; color: var(--text-1); }
+    .sel-action {
+      background: none; border: none; cursor: pointer;
+      font-size: 0.8rem; font-family: inherit;
+      color: var(--accent); padding: 0; text-decoration: underline;
+    }
+    .sel-action:hover { opacity: 0.75; }
+    .sel-spacer { flex: 1; }
+    .btn-delete {
+      display: inline-flex; align-items: center; gap: 0.3rem;
+      padding: 0.32rem 0.75rem; font-size: 0.79rem; font-weight: 600;
+      background: #000000; color: #fff1e6; border: 1px solid rgba(244,121,32,.3);
+      border-radius: 6px; cursor: pointer; font-family: inherit;
+      transition: background 0.12s;
+    }
+    .btn-delete:hover { background: #1a1a1a; }
+
+    /* Re-score progress bar */
+    .rescore-progress {
+      display: none;
+      align-items: center;
+      gap: 0.5rem;
+      flex: 1;
+    }
+    .rescore-bar-wrap {
+      height: 6px;
+      flex: 1;
+      min-width: 80px;
+      max-width: 180px;
+      background: var(--border);
+      border-radius: 3px;
+      overflow: hidden;
+    }
+    .rescore-bar-fill {
+      height: 100%;
+      width: 0%;
+      background: linear-gradient(90deg, var(--accent), var(--accent-h));
+      border-radius: 3px;
+      transition: width 0.25s ease;
+    }
+    .rescore-progress-text {
+      font-size: 0.78rem;
+      color: var(--text-2);
+      white-space: nowrap;
+    }
+
+    /* Card checkbox */
+    .card-check {
+      display: flex; align-items: center; flex-shrink: 0;
+    }
+    .card-check input[type="checkbox"] {
+      width: 15px; height: 15px; cursor: pointer;
+      opacity: 0.25; accent-color: var(--accent);
+      transition: opacity 0.12s;
+    }
+    .cand-card:hover .card-check input[type="checkbox"],
+    .card-check input[type="checkbox"]:checked { opacity: 1; }
+    .cand-card.selected {
+      border-color: rgba(244,121,32,.7);
+      background: var(--selected-bg);
+    }
+
+    .empty-state {
+      text-align: center;
+      padding: 3rem 1rem;
+      color: var(--text-2);
+      font-size: 0.88rem;
+    }
+
+    /* ── Overlays ── */
+    .overlay {
+      position: fixed; inset: 0;
+      background: rgba(0,0,0,.62);
+      display: none;
+      align-items: center;
+      justify-content: center;
+      z-index: 100;
+    }
+    .overlay.open { display: flex; }
+
+    /* Upload panel */
+    .upload-panel {
+      background: var(--upload-bg);
+      border-radius: 12px;
+      padding: 1.6rem;
+      width: 500px;
+      max-width: 95vw;
+      max-height: 90vh;
+      overflow-y: auto;
+      box-shadow: 0 22px 48px rgba(0,0,0,.34);
+      color: var(--text-1);
+      border: 1px solid var(--border);
+    }
+    .upload-panel h2 {
+      font-size: 1rem; font-weight: 700; margin-bottom: 1.2rem;
+    }
+    .field { display: flex; flex-direction: column; gap: 0.3rem; margin-bottom: 1rem; }
+    .field label {
+      font-size: 0.68rem; font-weight: 700;
+      color: var(--text-2); text-transform: uppercase; letter-spacing: 0.07em;
+    }
+    .field select, .field input {
+      padding: 0.48rem 0.7rem;
+      border: 1px solid var(--input-border);
+      border-radius: 7px;
+      font-size: 0.87rem;
+      font-family: inherit;
+      background: var(--input-bg);
+      color: var(--text-1);
+    }
+    .file-drop {
+      border: 2px dashed var(--input-border);
+      border-radius: 8px;
+      padding: 1.4rem;
+      text-align: center;
+      cursor: pointer;
+      font-size: 0.85rem;
+      color: var(--text-2);
+      margin-bottom: 1rem;
+      transition: border-color 0.15s, color 0.15s;
+    }
+    .file-drop:hover        { border-color: var(--accent); color: var(--accent); }
+    .file-drop.has-files    { border-color: #10b981; color: #059669; }
+    [data-theme="dark"] .file-drop.has-files { color: #34d399; }
+
+    .upload-actions { display: flex; gap: 0.55rem; align-items: center; margin-bottom: 1rem; }
+    .btn-cancel {
+      height: 32px;
+      padding: 0 0.9rem;
+      font-size: 0.82rem;
+      background: transparent;
+      color: var(--text-2);
+      border: 1px solid var(--input-border);
+      border-radius: 7px;
+      cursor: pointer;
+      font-family: inherit;
+      transition: background 0.12s;
+    }
+    .btn-cancel:hover { background: var(--border); color: var(--text-1); }
+
+    .upload-result {
+      padding: 0.48rem 0.7rem;
+      border-radius: 7px;
+      font-size: 0.81rem;
+      margin-bottom: 0.35rem;
+      line-height: 1.45;
+    }
+    .upload-result.ok   { background: var(--ok-bg);   color: var(--ok-text); }
+    .upload-result.warn { background: var(--warn-bg); color: var(--warn-text); }
+    .upload-result.err  { background: var(--err-bg);  color: var(--err-text); }
+
+    /* Spinner */
+    @keyframes spin { to { transform: rotate(360deg); } }
+    .spinner {
+      width: 16px; height: 16px; flex-shrink: 0;
+      border: 2px solid var(--border);
+      border-top-color: var(--accent);
+      border-radius: 50%;
+      animation: spin 0.65s linear infinite;
+    }
+    .progress-msg {
+      display: flex; align-items: center; gap: 0.5rem;
+      font-size: 0.83rem; color: var(--text-2);
+      padding: 0.2rem 0; margin-bottom: 0.5rem;
+    }
+
+    /* JD Manager list */
+    .jd-list-header {
+      display: flex; align-items: center; gap: 0.5rem;
+      margin-bottom: 0.5rem;
+    }
+    .jd-item {
+      display: flex; align-items: center; gap: 0.55rem;
+      padding: 0.42rem 0.6rem;
+      border-radius: 7px;
+      border: 1px solid var(--border);
+      background: var(--input-bg);
+      font-size: 0.85rem;
+      color: var(--text-1);
+    }
+    .jd-item input[type="checkbox"] {
+      width: 15px; height: 15px; cursor: pointer;
+      accent-color: var(--accent); flex-shrink: 0;
+    }
+    .jd-item-name {
+      flex: 1; min-width: 0;
+      overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
+    }
+
+    /* Viewer */
+    .viewer-panel {
+      background: var(--viewer-bg);
+      border-radius: 10px;
+      width: 88vw; height: 90vh;
+      display: flex; flex-direction: column;
+      overflow: hidden;
+      box-shadow: 0 22px 48px rgba(0,0,0,.42);
+      border: 1px solid var(--border);
+    }
+    .viewer-header {
+      padding: 0.55rem 0.9rem;
+      border-bottom: 1px solid var(--vhdr-border);
+      display: flex; align-items: center;
+      justify-content: space-between;
+      flex-shrink: 0; gap: 0.75rem;
+    }
+    .viewer-title {
+      font-weight: 600; font-size: 0.88rem; color: var(--text-1);
+      min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
+    }
+    .viewer-close {
+      background: none; border: none; cursor: pointer;
+      font-size: 0.95rem; color: var(--text-2);
+      flex-shrink: 0; padding: 0.2rem 0.4rem; border-radius: 5px;
+      transition: background 0.12s;
+    }
+    .viewer-close:hover { background: var(--border); color: var(--text-1); }
+    #viewer-frame { flex: 1; border: none; width: 100%; display: block; }
+  </style>
+</head>
+<body>
+
+<!-- ── JD Manager overlay ── -->
+<div class="overlay" id="jd-overlay">
+  <div class="upload-panel">
+    <h2>Job Descriptions</h2>
+
+    <!-- Existing JDs list (hidden if empty at load) -->
+    <div id="jd-list-section"{% if not jds %} style="display:none"{% endif %}>
+      <div class="jd-list-header">
+        <label class="sel-all-wrap" title="Select all">
+          <input type="checkbox" id="jd-select-all-cb" onchange="toggleSelectAllJDs()">
+        </label>
+        <span id="jd-count-label" style="font-size:0.78rem;color:var(--text-2);flex:1;">{{ jds|length }} JD{{ 's' if jds|length != 1 else '' }}</span>
+        <button class="btn-delete" id="btn-delete-jds" onclick="deleteSelectedJDs()" disabled
+                style="font-size:0.76rem;padding:0.28rem 0.65rem;">Delete selected</button>
+      </div>
+      <div id="jd-items-list" style="display:flex;flex-direction:column;gap:0.3rem;margin-bottom:1rem;">
+        {% for jd in jds %}
+        <div class="jd-item" data-jd-id="{{ jd.id }}">
+          <input type="checkbox" onchange="updateJDSelection()">
+          <span class="jd-item-name">{{ jd.name }}</span>
+        </div>
+        {% endfor %}
+      </div>
+      <div style="border-top:1px solid var(--border);margin-bottom:1rem;"></div>
+    </div>
+
+    <!-- Add New JD -->
+    <div style="font-size:0.7rem;font-weight:700;color:var(--text-2);text-transform:uppercase;letter-spacing:0.07em;margin-bottom:0.85rem;">Add New JD</div>
+    <form id="jd-form">
+      <div class="field">
+        <label>Name <span style="font-weight:400;text-transform:none;letter-spacing:0">(optional — defaults to filename)</span></label>
+        <input type="text" id="jd-name" placeholder="e.g. Senior Backend Engineer">
+      </div>
+      <div class="file-drop" id="jd-file-drop" onclick="document.getElementById('jd-file-input').click()">
+        <div id="jd-drop-prompt">Drop PDF, DOCX, or TXT here, or <strong>click to browse</strong></div>
+        <div id="jd-file-name" style="display:none; margin-top:0.4rem;"></div>
+        <input id="jd-file-input" type="file" accept=".pdf,.docx,.txt" style="display:none">
+      </div>
+      <div id="jd-progress" class="progress-msg" style="display:none">
+        <span class="spinner"></span>
+        <span>Extracting requirements and scoring recent resumes…</span>
+      </div>
+      <div class="upload-actions">
+        <button type="submit" class="btn" id="jd-process-btn" disabled>Add JD</button>
+        <button type="button" class="btn-cancel" onclick="closeJDManager()">Cancel</button>
+      </div>
+    </form>
+    <div id="jd-result"></div>
+  </div>
+</div>
+
+<!-- ── Upload overlay ── -->
+<div class="overlay" id="overlay">
+  <div class="upload-panel">
+    <h2>Add Resumes</h2>
+    <form id="upload-form">
+      <div class="file-drop" id="file-drop" onclick="document.getElementById('file-input').click()">
+        <div id="drop-prompt">Drop PDF or DOCX files here, or <strong>click to browse</strong></div>
+        <div id="file-names" style="display:none; margin-top:0.4rem;"></div>
+        <input id="file-input" type="file" name="files" multiple accept=".pdf,.docx" style="display:none">
+      </div>
+      <div id="upload-progress" class="progress-msg" style="display:none">
+        <span class="spinner"></span>
+        <span id="upload-progress-text">Processing…</span>
+      </div>
+      <div class="upload-actions">
+        <button type="submit" class="btn" id="process-btn" disabled>Process Files</button>
+        <button type="button" class="btn-cancel" onclick="closeUpload()">Cancel</button>
+      </div>
+    </form>
+    <div id="upload-results"></div>
+    <div id="refresh-prompt" style="display:none; margin-top:0.5rem;">
+      <button class="btn-cancel" onclick="window.location.reload()">Refresh list</button>
+    </div>
+  </div>
+</div>
+
+<!-- ── File viewer overlay ── -->
+<div class="overlay" id="viewer-overlay">
+  <div class="viewer-panel">
+    <div class="viewer-header">
+      <span class="viewer-title" id="viewer-title"></span>
+      <button class="viewer-close" onclick="closeViewer()" title="Close">&#x2715;</button>
+    </div>
+    <iframe id="viewer-frame" src="about:blank" allowfullscreen></iframe>
+  </div>
+</div>
+
+<!-- ── Header ── -->
+<header class="header">
+  <div class="header-left">
+    <div class="brand-logo" aria-label="Groz Engineering">
+      <img src="/images/MicrosoftTeams-image.png" alt="Groz Engineering logo">
+    </div>
+    <span class="brand-title">Application Tracking System</span>
+  </div>
+  <div class="header-right">
+    <button class="theme-btn" onclick="toggleTheme()" title="Toggle theme" aria-label="Toggle dark mode">
+      <span class="icon-moon">
+        <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+          <path d="M21 12.79A9 9 0 1 1 11.21 3 7 7 0 0 0 21 12.79z"/>
+        </svg>
+      </span>
+      <span class="icon-sun">
+        <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+          <circle cx="12" cy="12" r="5"/>
+          <line x1="12" y1="1" x2="12" y2="3"/>
+          <line x1="12" y1="21" x2="12" y2="23"/>
+          <line x1="4.22" y1="4.22" x2="5.64" y2="5.64"/>
+          <line x1="18.36" y1="18.36" x2="19.78" y2="19.78"/>
+          <line x1="1" y1="12" x2="3" y2="12"/>
+          <line x1="21" y1="12" x2="23" y2="12"/>
+          <line x1="4.22" y1="19.78" x2="5.64" y2="18.36"/>
+          <line x1="18.36" y1="5.64" x2="19.78" y2="4.22"/>
+        </svg>
+      </span>
+    </button>
+    <button class="btn-outline" onclick="openJDManager()">
+      <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round">
+        <line x1="12" y1="5" x2="12" y2="19"/>
+        <line x1="5" y1="12" x2="19" y2="12"/>
+      </svg>
+      Add / Manage JDs
+    </button>
+    <button class="btn" onclick="openUpload()">
+      <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round">
+        <line x1="12" y1="5" x2="12" y2="19"/>
+        <line x1="5" y1="12" x2="19" y2="12"/>
+      </svg>
+      Add Resumes
+    </button>
+    <a href="/logout" class="btn-logout">Sign out</a>
+  </div>
+</header>
+
+<!-- ── Filters ── -->
+<div class="filters">
+  <label class="sel-all-wrap" title="Select / deselect all visible">
+    <input type="checkbox" id="select-all-cb" onchange="toggleSelectAll()">
+  </label>
+  <div class="search-wrap">
+    <span class="search-icon">
+      <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round">
+        <circle cx="11" cy="11" r="8"/>
+        <line x1="21" y1="21" x2="16.65" y2="16.65"/>
+      </svg>
+    </span>
+    <input id="q" type="search" placeholder="Search name, skills…" oninput="debounce(applyFilters, 200)()">
+  </div>
+  <select id="jd-filter" onchange="updateScores()">
+    <option value="">All job descriptions</option>
+    {% for jd in jds %}
+    <option value="{{ jd.id }}"{% if current_jd_id == jd.id %} selected{% endif %}>{{ jd.name }}</option>
+    {% endfor %}
+  </select>
+  <select id="status-filter" onchange="applyFilters()">
+    <option value="">All statuses</option>
+    <option value="shortlisted">Shortlisted</option>
+    <option value="interviewed">Interviewed</option>
+    <option value="selected">Selected</option>
+    <option value="rejected">Rejected</option>
+  </select>
+  <span class="filter-label">Score &ge;</span>
+  <input id="min-score" type="number" min="0" max="100" placeholder="%" oninput="debounce(applyFilters, 200)()">
+  <span class="filter-label">Exp &ge;</span>
+  <input id="min-years" type="number" min="0" step="0.5" placeholder="yrs" oninput="debounce(applyFilters, 200)()">
+  <span class="filter-label">Sort</span>
+  <select id="sort-by" onchange="sortCards()">
+    <option value="name-asc">Name A→Z</option>
+    <option value="name-desc">Name Z→A</option>
+    <option value="exp">Experience ↓</option>
+    <option value="score" id="sort-score-opt" disabled>Score ↓</option>
+  </select>
+  <button class="btn-clear-filters" id="btn-clear-filters" onclick="clearFilters()" style="display:none" title="Clear all filters">
+    <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round">
+      <line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/>
+    </svg>
+    Clear filters
+  </button>
+</div>
+
+<!-- ── Select / delete bar ── -->
+<div class="select-bar" id="select-bar">
+  <span class="sel-count" id="sel-count">0 selected</span>
+  <button class="sel-action" onclick="selectAllVisible()">Select all visible</button>
+  <button class="sel-action" onclick="deselectAll()">Deselect all</button>
+  <span class="sel-spacer" id="sel-spacer"></span>
+  <div class="rescore-progress" id="rescore-progress">
+    <div class="rescore-bar-wrap">
+      <div class="rescore-bar-fill" id="rescore-bar-fill"></div>
+    </div>
+    <span class="rescore-progress-text" id="rescore-progress-text"></span>
+  </div>
+  <button class="btn-rescore" id="btn-rescore" onclick="rescoreSelected()" disabled title="Select a JD first">
+    <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round">
+      <polyline points="23 4 23 10 17 10"/><polyline points="1 20 1 14 7 14"/>
+      <path d="M3.51 9a9 9 0 0 1 14.85-3.36L23 10M1 14l4.64 4.36A9 9 0 0 0 20.49 15"/>
+    </svg>
+    Re-score
+  </button>
+  <button class="btn-delete" onclick="deleteSelected()">
+    <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round">
+      <polyline points="3 6 5 6 21 6"/><path d="M19 6l-1 14a2 2 0 0 1-2 2H8a2 2 0 0 1-2-2L5 6"/>
+      <path d="M10 11v6"/><path d="M14 11v6"/>
+      <path d="M9 6V4a1 1 0 0 1 1-1h4a1 1 0 0 1 1 1v2"/>
+    </svg>
+    Delete selected
+  </button>
+</div>
+
+<!-- ── Candidates list ── -->
+<div class="list-area{% if not current_jd_id %} no-score{% endif %}" id="list-area">
+  {% if results %}
+  {% for r in results %}
+  {% set bd    = r.score_breakdown or {} %}
+  {% set score = r.ats_score %}
+  {% set years = bd.get('years_experience') %}
+  {% set colors = r.candidate_name|avatar_color %}
+
+  <div class="cand-card"
+       data-resume-id="{{ r.id }}"
+       data-name="{{ (r.candidate_name or '')|lower }}"
+       data-skills="{{ (r.skills_list|join(' '))|lower }}"
+       data-years="{{ years if years is not none else '' }}"
+       data-score="{{ score if score is not none else '' }}"
+       data-scores='{{ r.get("all_scores", {})|tojson }}'
+       data-status="{{ r.status or '' }}">
+
+    <div class="card-check">
+      <input type="checkbox" onchange="updateSelection()" title="Select">
+    </div>
+
+    <div class="avatar" data-bg="{{ colors[0] }}" data-fg="{{ colors[1] }}">
+      {{ r.candidate_name|initials }}
+    </div>
+
+    <div class="cand-body">
+      <div class="cand-name">
+        <a href="/resume/{{ r.id }}{% if current_jd_id %}?jd_id={{ current_jd_id }}{% endif %}">
+          {{ r.candidate_name or 'Unknown' }}
+        </a>
+      </div>
+      <div class="cand-meta">
+        {% if r.email %}<span>{{ r.email }}</span>{% endif %}
+        {% if r.location %}{% if r.email %}<span class="meta-sep">·</span>{% endif %}<span>{{ r.location }}</span>{% endif %}
+        {% if years is not none %}{% if r.email or r.location %}<span class="meta-sep">·</span>{% endif %}<span>{{ "%.1f"|format(years) }} yrs exp</span>{% endif %}
+      </div>
+      {% if r.skills_list %}
+      <div class="cand-skills">{{ r.skills_list|join(', ') }}{% if r.skills_list|length == 6 %}…{% endif %}</div>
+      {% endif %}
+    </div>
+
+    <div class="cand-aside">
+      <span class="score-val">
+        {% if score is not none %}{{ (score * 100)|int }}{% else %}—{% endif %}
+      </span>
+      <select class="status-select{% if r.status %} status-{{ r.status }}{% endif %}"
+              data-resume-id="{{ r.id }}"
+              onchange="updateStatus(this)">
+        <option value="">— Status —</option>
+        <option value="shortlisted"{% if r.status == 'shortlisted' %} selected{% endif %}>Shortlisted</option>
+        <option value="interviewed"{% if r.status == 'interviewed' %} selected{% endif %}>Interviewed</option>
+        <option value="selected"{% if r.status == 'selected' %} selected{% endif %}>Selected</option>
+        <option value="rejected"{% if r.status == 'rejected' %} selected{% endif %}>Rejected</option>
+      </select>
+      <button class="btn-view"
+              data-resume-id="{{ r.id }}"
+              data-candidate="{{ r.candidate_name or '' }}"
+              onclick="openViewer(this)">
+        <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+          <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/>
+          <polyline points="14 2 14 8 20 8"/>
+        </svg>
+        View File
+      </button>
+    </div>
+  </div>
+  {% endfor %}
+  {% else %}
+  <div class="empty-state" id="empty-db">
+    No candidates in database. Click <strong>+ Add Resumes</strong> to get started.
+  </div>
+  {% endif %}
+
+  <div class="empty-state" id="empty-filter" style="display:none;">
+    No candidates match the current filters.
+  </div>
+</div>
+
+<!-- ── Footer ── -->
+<div class="footer">
+  <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+    <path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"/>
+    <circle cx="9" cy="7" r="4"/>
+    <path d="M23 21v-2a4 4 0 0 0-3-3.87"/>
+    <path d="M16 3.13a4 4 0 0 1 0 7.75"/>
+  </svg>
+  <span id="count-label">{{ results|length }} candidate{{ 's' if results|length != 1 else '' }} found</span>
+</div>
+
+<script>
+// ── Avatar helpers (mirrors Jinja2 filters so injected cards match rendered cards) ──
+const _AP = [
+  ["#dbeafe","#1d4ed8"],["#d1fae5","#065f46"],
+  ["#fef3c7","#92400e"],["#fce7f3","#9d174d"],
+  ["#ede9fe","#5b21b6"],["#fee2e2","#991b1b"],
+  ["#e0f2fe","#0369a1"],["#fef9c3","#854d0e"],
+];
+function _ac(name) { const h=(name||'').split('').reduce((s,c)=>s+c.charCodeAt(0),0); return _AP[h%_AP.length]; }
+function _ini(name) {
+  const p=(name||'?').trim().split(/\s+/);
+  if(p.length>=2) return (p[0][0]+p[p.length-1][0]).toUpperCase();
+  return (p[0].length>=2?p[0].slice(0,2):p[0][0]).toUpperCase();
+}
+
+// ── Build a candidate card HTML string (for DOM injection after upload) ──
+function buildCard(r) {
+  const name = r.candidate_name || 'Unknown';
+  const [bg, fg] = _ac(name);
+  const bd   = r.score_breakdown || {};
+  const yrs  = bd.years_experience;
+  const jdId = document.getElementById('jd-filter').value;
+  const all  = r.all_scores || {};
+  const score = jdId && all[jdId] != null ? all[jdId] : (r.ats_score != null ? r.ats_score : null);
+
+  const meta = [];
+  if (r.email)    meta.push(`<span>${escHtml(r.email)}</span>`);
+  if (r.location) meta.push(`<span>${escHtml(r.location)}</span>`);
+  if (yrs != null) meta.push(`<span>${yrs.toFixed(1)} yrs exp</span>`);
+  const metaHtml = meta.map((s,i)=>(i>0?'<span class="meta-sep">·</span>':'')+s).join('');
+
+  const skills = r.skills_list || [];
+  const skillsHtml = skills.length
+    ? `<div class="cand-skills">${escHtml(skills.join(', '))}${skills.length>=6?'…':''}</div>` : '';
+
+  const scoreText = score != null ? Math.round(score * 100) : '—';
+  const url = `/resume/${r.id}${jdId?'?jd_id='+jdId:''}`;
+
+  const st = r.status || '';
+  const stClass = st ? ` status-${st}` : '';
+  const stOpts = ['shortlisted','interviewed','selected','rejected']
+    .map(v => `<option value="${v}"${st===v?' selected':''}>${v[0].toUpperCase()+v.slice(1)}</option>`)
+    .join('');
+
+  return `<div class="cand-card"
+     data-resume-id="${r.id}"
+     data-name="${escHtml(name.toLowerCase())}"
+     data-skills="${escHtml(skills.join(' ').toLowerCase())}"
+     data-years="${yrs!=null?yrs:''}"
+     data-score="${score!=null?score:''}"
+     data-scores='${JSON.stringify(all)}'
+     data-status="${escHtml(st)}">
+  <div class="card-check"><input type="checkbox" onchange="updateSelection()" title="Select"></div>
+  <div class="avatar" style="background:${bg};color:${fg};">${_ini(name)}</div>
+  <div class="cand-body">
+    <div class="cand-name"><a href="${url}">${escHtml(name)}</a></div>
+    <div class="cand-meta">${metaHtml}</div>
+    ${skillsHtml}
+  </div>
+  <div class="cand-aside">
+    <span class="score-val">${scoreText}</span>
+    <select class="status-select${stClass}" data-resume-id="${r.id}" onchange="updateStatus(this)">
+      <option value="">\u2014 Status \u2014</option>
+      ${stOpts}
+    </select>
+    <button class="btn-view" data-resume-id="${r.id}" data-candidate="${escHtml(name)}" onclick="openViewer(this)">
+      <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+        <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/>
+        <polyline points="14 2 14 8 20 8"/>
+      </svg>
+      View File
+    </button>
+  </div>
+</div>`;
+}
+
+// ── Candidate status ──
+async function updateStatus(sel) {
+  const card     = sel.closest('.cand-card');
+  const resumeId = card.dataset.resumeId;
+  const status   = sel.value || null;
+
+  try {
+    const resp = await fetch(`/resumes/${resumeId}/status`, {
+      method: 'PATCH',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ status }),
+    });
+    if (!resp.ok) throw new Error('server error');
+    card.dataset.status = status || '';
+    sel.className = 'status-select' + (status ? ' status-' + status : '');
+    applyFilters();
+  } catch(_) {
+    sel.value = card.dataset.status || '';
+  }
+}
+
+// ── Theme toggle ──
+function toggleTheme() {
+  const html = document.documentElement;
+  const next = html.getAttribute('data-theme') === 'dark' ? 'light' : 'dark';
+  html.setAttribute('data-theme', next);
+  localStorage.setItem('rp-theme', next);
+}
+
+// ── Debounce utility ──
+function debounce(fn, delay) {
+  let t;
+  return (...args) => { clearTimeout(t); t = setTimeout(() => fn(...args), delay); };
+}
+
+// ── Sort cards in DOM ──
+function sortCards() {
+  const sortBy   = document.getElementById('sort-by').value;
+  const listArea = document.getElementById('list-area');
+  const cards    = Array.from(listArea.querySelectorAll('.cand-card'));
+
+  cards.sort((a, b) => {
+    if (sortBy === 'name-asc')  return (a.dataset.name || '').localeCompare(b.dataset.name || '');
+    if (sortBy === 'name-desc') return (b.dataset.name || '').localeCompare(a.dataset.name || '');
+    if (sortBy === 'exp')       return (parseFloat(b.dataset.years) || 0) - (parseFloat(a.dataset.years) || 0);
+    if (sortBy === 'score')     return (parseFloat(b.dataset.score) || 0) - (parseFloat(a.dataset.score) || 0);
+    return 0;
+  });
+
+  const emptyFilter = document.getElementById('empty-filter');
+  cards.forEach(card => listArea.insertBefore(card, emptyFilter));
+}
+
+// ── Clear all filters ──
+function clearFilters() {
+  document.getElementById('q').value = '';
+  document.getElementById('status-filter').value = '';
+  document.getElementById('min-score').value = '';
+  document.getElementById('min-years').value = '';
+  document.getElementById('sort-by').value = 'name-asc';
+  applyFilters();
+}
+
+// ── Filter logic ──
+function applyFilters() {
+  const query        = document.getElementById('q').value.trim().toLowerCase();
+  const statusFilter = document.getElementById('status-filter').value;
+  const minPct       = parseFloat(document.getElementById('min-score').value);
+  const minYrs       = parseFloat(document.getElementById('min-years').value);
+  const cards        = document.querySelectorAll('.cand-card');
+  let visible        = 0;
+
+  cards.forEach(card => {
+    const name   = card.dataset.name   || '';
+    const skills = card.dataset.skills || '';
+    const score  = card.dataset.score  !== '' ? parseFloat(card.dataset.score)  : null;
+    const years  = card.dataset.years  !== '' ? parseFloat(card.dataset.years) : null;
+    const status = card.dataset.status || '';
+
+    const okText   = !query        || name.includes(query) || skills.includes(query);
+    const _prog = ['shortlisted', 'interviewed', 'selected'];
+    const okStatus = !statusFilter || (
+      statusFilter === 'rejected'
+        ? status === 'rejected'
+        : _prog.indexOf(status) >= _prog.indexOf(statusFilter)
+    );
+    const okScore  = isNaN(minPct) || score === null        || score * 100 >= minPct;
+    const okYears  = isNaN(minYrs) || years === null        || years >= minYrs;
+
+    if (okText && okStatus && okScore && okYears) {
+      card.classList.remove('hidden');
+      visible++;
+    } else {
+      card.classList.add('hidden');
+    }
+  });
+
+  const filterEmpty = document.getElementById('empty-filter');
+  if (filterEmpty) filterEmpty.style.display = (cards.length > 0 && visible === 0) ? '' : 'none';
+
+  const label = document.getElementById('count-label');
+  if (label) label.textContent = visible + ' candidate' + (visible === 1 ? '' : 's') + ' found';
+
+  const hasFilters = query || statusFilter || !isNaN(minPct) || !isNaN(minYrs);
+  const clearBtn = document.getElementById('btn-clear-filters');
+  if (clearBtn) clearBtn.style.display = hasFilters ? '' : 'none';
+
+  sortCards();
+}
+
+// ── Update scores + visibility when JD changes ──
+function updateScores() {
+  const jdId     = document.getElementById('jd-filter').value;
+  const listArea = document.getElementById('list-area');
+  const sortSel  = document.getElementById('sort-by');
+  const scoreOpt = document.getElementById('sort-score-opt');
+
+  document.querySelectorAll('.cand-card').forEach(card => {
+    let scores = {};
+    try { scores = JSON.parse(card.dataset.scores || '{}'); } catch(e) {}
+    const score = jdId ? (scores[jdId] != null ? scores[jdId] : null) : null;
+    card.dataset.score = score != null ? score : '';
+    const scoreEl = card.querySelector('.score-val');
+    if (scoreEl) scoreEl.textContent = score != null ? Math.round(score * 100) : '—';
+  });
+
+  if (jdId) {
+    listArea.classList.remove('no-score');
+    scoreOpt.disabled = false;
+  } else {
+    listArea.classList.add('no-score');
+    scoreOpt.disabled = true;
+    if (sortSel.value === 'score') sortSel.value = 'name-asc';
+  }
+
+  // Keep re-score button in sync
+  const rescoreBtn = document.getElementById('btn-rescore');
+  if (rescoreBtn) {
+    const n = document.querySelectorAll('.cand-card.selected').length;
+    rescoreBtn.disabled = !(jdId && n > 0);
+    rescoreBtn.title = jdId ? '' : 'Select a job description first';
+  }
+
+  applyFilters();
+}
+
+// ── File viewer ──
+function openViewer(btn) {
+  const id   = btn.dataset.resumeId;
+  const name = btn.dataset.candidate || 'Resume';
+  document.getElementById('viewer-title').textContent = name;
+  document.getElementById('viewer-frame').src = '/file/' + id;
+  document.getElementById('viewer-overlay').classList.add('open');
+}
+function closeViewer() {
+  document.getElementById('viewer-overlay').classList.remove('open');
+  document.getElementById('viewer-frame').src = 'about:blank';
+}
+document.getElementById('viewer-overlay').addEventListener('click', e => {
+  if (e.target === document.getElementById('viewer-overlay')) closeViewer();
+});
+
+// ── Upload panel ──
+function openUpload()  { document.getElementById('overlay').classList.add('open'); }
+function closeUpload() {
+  document.getElementById('overlay').classList.remove('open');
+  document.getElementById('upload-results').innerHTML = '';
+  document.getElementById('refresh-prompt').style.display = 'none';
+  document.getElementById('file-names').style.display = 'none';
+  document.getElementById('file-names').textContent = '';
+  document.getElementById('drop-prompt').style.display = '';
+  document.getElementById('file-drop').classList.remove('has-files');
+  document.getElementById('file-input').value = '';
+  document.getElementById('process-btn').disabled = true;
+}
+document.getElementById('overlay').addEventListener('click', e => {
+  if (e.target === document.getElementById('overlay')) closeUpload();
+});
+
+document.getElementById('file-input').addEventListener('change', function() {
+  const names   = Array.from(this.files).map(f => f.name);
+  const namesEl = document.getElementById('file-names');
+  const dropEl  = document.getElementById('file-drop');
+  const prompt  = document.getElementById('drop-prompt');
+  if (names.length) {
+    namesEl.textContent   = names.join(', ');
+    namesEl.style.display = '';
+    prompt.style.display  = 'none';
+    dropEl.classList.add('has-files');
+    document.getElementById('process-btn').disabled = false;
+  } else {
+    namesEl.style.display = 'none';
+    prompt.style.display  = '';
+    dropEl.classList.remove('has-files');
+    document.getElementById('process-btn').disabled = true;
+  }
+});
+
+document.getElementById('upload-form').addEventListener('submit', async function(e) {
+  e.preventDefault();
+  const btn       = document.getElementById('process-btn');
+  const resultsEl = document.getElementById('upload-results');
+  const refreshEl = document.getElementById('refresh-prompt');
+  const progEl    = document.getElementById('upload-progress');
+  const progText  = document.getElementById('upload-progress-text');
+
+  const files = Array.from(document.getElementById('file-input').files);
+  btn.disabled = true;
+  resultsEl.innerHTML = '';
+  progEl.style.display = '';
+
+  const allResults = [];
+  const newIds     = [];
+
+  for (let i = 0; i < files.length; i++) {
+    progText.textContent = files.length > 1
+      ? `Processing file ${i + 1} of ${files.length}…`
+      : 'Processing…';
+
+    const fd = new FormData();
+    fd.append('files', files[i]);
+
+    try {
+      const resp = await fetch('/upload', { method: 'POST', body: fd });
+      const data = await resp.json();
+      allResults.push(...data.results);
+      data.results.forEach(r => { if (r.status === 'added' && r.resume_id) newIds.push(r.resume_id); });
+    } catch(err) {
+      allResults.push({ filename: files[i].name, status: 'error', error: String(err) });
+    }
+  }
+
+  progEl.style.display = 'none';
+
+  resultsEl.innerHTML = allResults.map(r => {
+    if (r.status === 'added') {
+      if (r.duplicates && r.duplicates.length > 0) {
+        const d = r.duplicates[0];
+        return `<div class="upload-result warn">⚠ <strong>${escHtml(r.candidate_name || r.filename)}</strong> — Added<br>
+          <small>Possible duplicate of <strong>${escHtml(d.name)}</strong> (matched on: ${d.matched_on.join(', ')})</small></div>`;
+      }
+      return `<div class="upload-result ok">✓ <strong>${escHtml(r.candidate_name || r.filename)}</strong> — Added</div>`;
+    }
+    return `<div class="upload-result err">✗ <strong>${escHtml(r.filename)}</strong> — ${escHtml(r.error || 'Unknown error')}</div>`;
+  }).join('');
+
+  if (newIds.length > 0) {
+    try {
+      const cr = await fetch('/resumes/cards?ids=' + newIds.join(','));
+      const cd = await cr.json();
+      const listArea = document.getElementById('list-area');
+      const emptyDb  = document.getElementById('empty-db');
+      const emptyFlt = document.getElementById('empty-filter');
+      if (emptyDb) emptyDb.style.display = 'none';
+      cd.results.forEach(r => {
+        const wrap = document.createElement('div');
+        wrap.innerHTML = buildCard(r).trim();
+        const card = wrap.firstElementChild;
+        if (card) listArea.insertBefore(card, emptyFlt);
+      });
+      applyFilters();
+    } catch(_) {
+      refreshEl.style.display = '';
+    }
+  }
+
+  btn.disabled = false;
+});
+
+function escHtml(str) {
+  return String(str).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');
+}
+
+// ── JD Manager overlay ──
+function openJDManager() { document.getElementById('jd-overlay').classList.add('open'); }
+function closeJDManager() {
+  document.getElementById('jd-overlay').classList.remove('open');
+  document.getElementById('jd-result').innerHTML = '';
+  document.getElementById('jd-name').value = '';
+  document.getElementById('jd-file-name').style.display = 'none';
+  document.getElementById('jd-drop-prompt').style.display = '';
+  document.getElementById('jd-file-drop').classList.remove('has-files');
+  document.getElementById('jd-file-input').value = '';
+  document.getElementById('jd-process-btn').disabled = true;
+  document.querySelectorAll('#jd-items-list .jd-item input[type="checkbox"]')
+    .forEach(cb => { cb.checked = false; });
+  updateJDSelection();
+}
+document.getElementById('jd-overlay').addEventListener('click', e => {
+  if (e.target === document.getElementById('jd-overlay')) closeJDManager();
+});
+
+function updateJDSelection() {
+  const items = document.querySelectorAll('#jd-items-list .jd-item input[type="checkbox"]');
+  const n = Array.from(items).filter(cb => cb.checked).length;
+  const deleteBtn = document.getElementById('btn-delete-jds');
+  if (deleteBtn) deleteBtn.disabled = n === 0;
+  const allCb = document.getElementById('jd-select-all-cb');
+  if (allCb) {
+    if (n === 0)           { allCb.checked = false; allCb.indeterminate = false; }
+    else if (n === items.length) { allCb.checked = true;  allCb.indeterminate = false; }
+    else                   { allCb.checked = false; allCb.indeterminate = true;  }
+  }
+}
+
+function toggleSelectAllJDs() {
+  const cb = document.getElementById('jd-select-all-cb');
+  document.querySelectorAll('#jd-items-list .jd-item input[type="checkbox"]')
+    .forEach(itemCb => { itemCb.checked = cb.checked; });
+  updateJDSelection();
+}
+
+async function deleteSelectedJDs() {
+  const checked = Array.from(
+    document.querySelectorAll('#jd-items-list .jd-item input[type="checkbox"]:checked')
+  );
+  if (!checked.length) return;
+  const ids = checked.map(cb => parseInt(cb.closest('.jd-item').dataset.jdId, 10));
+  const n = ids.length;
+  if (!confirm(`Delete ${n} job description${n===1?'':'s'}? Match records will also be removed.`)) return;
+
+  try {
+    const resp = await fetch('/jds', {
+      method: 'DELETE',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ ids }),
+    });
+    if (!resp.ok) throw new Error('Server error ' + resp.status);
+    const data = await resp.json();
+
+    data.deleted.forEach(id => {
+      const item = document.querySelector(`#jd-items-list .jd-item[data-jd-id="${id}"]`);
+      if (item) item.remove();
+      const sel = document.getElementById('jd-filter');
+      if (sel) {
+        const opt = sel.querySelector(`option[value="${id}"]`);
+        if (opt) opt.remove();
+        if (sel.value === String(id)) sel.value = '';
+      }
+    });
+
+    const remaining = document.querySelectorAll('#jd-items-list .jd-item').length;
+    const countLabel = document.getElementById('jd-count-label');
+    if (countLabel) countLabel.textContent = remaining + ' JD' + (remaining===1?'':'s');
+    const section = document.getElementById('jd-list-section');
+    if (section && remaining === 0) section.style.display = 'none';
+
+    updateJDSelection();
+    updateScores();
+  } catch(err) {
+    alert('Delete failed: ' + err.message);
+  }
+}
+
+document.getElementById('jd-file-input').addEventListener('change', function() {
+  const name  = this.files[0]?.name;
+  const nameEl = document.getElementById('jd-file-name');
+  const prompt = document.getElementById('jd-drop-prompt');
+  const dropEl = document.getElementById('jd-file-drop');
+  if (name) {
+    nameEl.textContent = name; nameEl.style.display = '';
+    prompt.style.display = 'none'; dropEl.classList.add('has-files');
+    document.getElementById('jd-process-btn').disabled = false;
+  } else {
+    nameEl.style.display = ''; prompt.style.display = '';
+    dropEl.classList.remove('has-files');
+    document.getElementById('jd-process-btn').disabled = true;
+  }
+});
+
+document.getElementById('jd-form').addEventListener('submit', async function(e) {
+  e.preventDefault();
+  const btn      = document.getElementById('jd-process-btn');
+  const resultEl = document.getElementById('jd-result');
+  const progEl   = document.getElementById('jd-progress');
+  btn.disabled   = true;
+  resultEl.innerHTML = '';
+  progEl.style.display = '';
+
+  const fd = new FormData();
+  fd.append('file', document.getElementById('jd-file-input').files[0]);
+  fd.append('name', document.getElementById('jd-name').value.trim());
+
+  try {
+    const resp = await fetch('/jd', { method: 'POST', body: fd });
+    const data = await resp.json();
+    if (data.error) {
+      resultEl.innerHTML = `<div class="upload-result err">✗ ${escHtml(data.error)}</div>`;
+    } else {
+      const n = data.scored_count;
+      resultEl.innerHTML = `<div class="upload-result ok">✓ <strong>${escHtml(data.name)}</strong> added · ${n} resume${n!==1?'s':''} scored</div>`;
+      addJdToDropdowns(data.jd_id, data.name);
+    }
+  } catch(err) {
+    resultEl.innerHTML = `<div class="upload-result err">✗ Failed: ${escHtml(String(err))}</div>`;
+  }
+
+  progEl.style.display = 'none';
+  btn.disabled = false;
+});
+
+function addJdToDropdowns(jd_id, name) {
+  const sel = document.getElementById('jd-filter');
+  if (sel) sel.add(new Option(name, jd_id));
+
+  // Show list section and append new item
+  const section = document.getElementById('jd-list-section');
+  if (section) section.style.display = '';
+  const list = document.getElementById('jd-items-list');
+  if (list) {
+    const item = document.createElement('div');
+    item.className = 'jd-item';
+    item.dataset.jdId = jd_id;
+    item.innerHTML = `<input type="checkbox" onchange="updateJDSelection()"><span class="jd-item-name">${escHtml(name)}</span>`;
+    list.appendChild(item);
+  }
+  const countLabel = document.getElementById('jd-count-label');
+  if (countLabel) {
+    const n = document.querySelectorAll('#jd-items-list .jd-item').length;
+    countLabel.textContent = n + ' JD' + (n===1?'':'s');
+  }
+}
+
+// ── Multiselect & delete ──
+function updateSelection() {
+  const allCards     = document.querySelectorAll('.cand-card');
+  const visibleCards = document.querySelectorAll('.cand-card:not(.hidden)');
+  const bar          = document.getElementById('select-bar');
+  const countEl      = document.getElementById('sel-count');
+
+  let n = 0;
+  allCards.forEach(card => {
+    const cb = card.querySelector('input[type="checkbox"]');
+    const checked = cb && cb.checked;
+    card.classList.toggle('selected', !!checked);
+    if (checked) n++;
+  });
+
+  if (n > 0) {
+    bar.classList.add('open');
+    countEl.textContent = n + ' selected';
+  } else {
+    bar.classList.remove('open');
+  }
+
+  // Select-all checkbox state
+  const allCb = document.getElementById('select-all-cb');
+  if (allCb) {
+    const checked = document.querySelectorAll('.cand-card:not(.hidden) input[type="checkbox"]:checked').length;
+    const total   = visibleCards.length;
+    if (checked === 0) { allCb.checked = false; allCb.indeterminate = false; }
+    else if (checked === total) { allCb.checked = true; allCb.indeterminate = false; }
+    else { allCb.checked = false; allCb.indeterminate = true; }
+  }
+
+  // Re-score button: enabled only when JD selected AND something is selected
+  const rescoreBtn = document.getElementById('btn-rescore');
+  if (rescoreBtn) {
+    const jdId = document.getElementById('jd-filter').value;
+    rescoreBtn.disabled = !(jdId && n > 0);
+    rescoreBtn.title = jdId ? '' : 'Select a job description first';
+  }
+}
+
+function selectAllVisible() {
+  document.querySelectorAll('.cand-card:not(.hidden) input[type="checkbox"]')
+    .forEach(cb => { cb.checked = true; });
+  updateSelection();
+}
+
+function deselectAll() {
+  document.querySelectorAll('.cand-card input[type="checkbox"]')
+    .forEach(cb => { cb.checked = false; });
+  updateSelection();
+}
+
+function toggleSelectAll() {
+  const cb = document.getElementById('select-all-cb');
+  if (cb.checked) selectAllVisible(); else deselectAll();
+}
+
+// ── Re-score selected resumes ──
+async function rescoreSelected() {
+  const jdId = document.getElementById('jd-filter').value;
+  if (!jdId) { alert('Please select a job description first.'); return; }
+
+  const selected = Array.from(document.querySelectorAll('.cand-card.selected'));
+  if (!selected.length) return;
+  const ids = selected.map(c => parseInt(c.dataset.resumeId, 10)).filter(Boolean);
+  const total = ids.length;
+
+  const btn        = document.getElementById('btn-rescore');
+  const deleteBtn  = document.querySelector('.select-bar .btn-delete');
+  const spacer     = document.getElementById('sel-spacer');
+  const progWrap   = document.getElementById('rescore-progress');
+  const barFill    = document.getElementById('rescore-bar-fill');
+  const progText   = document.getElementById('rescore-progress-text');
+
+  // Show progress bar, hide spacer + delete button
+  btn.disabled = true;
+  if (deleteBtn) deleteBtn.style.display = 'none';
+  spacer.style.display = 'none';
+  progWrap.style.display = 'flex';
+  barFill.style.width = '0%';
+  progText.textContent = `0 / ${total}`;
+
+  let done = 0;
+  for (const id of ids) {
+    try {
+      const resp = await fetch('/resumes/rescore', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ ids: [id], jd_id: parseInt(jdId) }),
+      });
+      if (resp.ok) {
+        const data = await resp.json();
+        data.results.forEach(r => {
+          const card = document.querySelector(`.cand-card[data-resume-id="${r.resume_id}"]`);
+          if (!card) return;
+          let scores = {};
+          try { scores = JSON.parse(card.dataset.scores || '{}'); } catch(e) {}
+          scores[String(jdId)] = r.score;
+          if (!scores.best || r.score > scores.best) scores.best = r.score;
+          card.dataset.scores = JSON.stringify(scores);
+          card.dataset.score  = r.score;
+          const el = card.querySelector('.score-val');
+          if (el) el.textContent = Math.round(r.score * 100);
+        });
+      }
+    } catch(_) {}
+
+    done++;
+    barFill.style.width = `${Math.round(done / total * 100)}%`;
+    progText.textContent = `${done} / ${total}`;
+  }
+
+  // Restore UI
+  progWrap.style.display = 'none';
+  spacer.style.display = '';
+  if (deleteBtn) deleteBtn.style.display = '';
+  btn.innerHTML = `<svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><polyline points="23 4 23 10 17 10"/><polyline points="1 20 1 14 7 14"/><path d="M3.51 9a9 9 0 0 1 14.85-3.36L23 10M1 14l4.64 4.36A9 9 0 0 0 20.49 15"/></svg> Re-score`;
+  btn.disabled = false;
+}
+
+async function deleteSelected() {
+  const selected = Array.from(
+    document.querySelectorAll('.cand-card.selected')
+  );
+  if (!selected.length) return;
+
+  const n = selected.length;
+  if (!confirm(`Delete ${n} resume${n === 1 ? '' : 's'}? This cannot be undone.`)) return;
+
+  const ids = selected.map(card => parseInt(card.dataset.resumeId, 10)).filter(Boolean);
+
+  try {
+    const resp = await fetch('/resumes', {
+      method: 'DELETE',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ ids }),
+    });
+    if (!resp.ok) throw new Error('Server error ' + resp.status);
+
+    selected.forEach(card => card.remove());
+    updateSelection();
+    applyFilters();
+  } catch(err) {
+    alert('Delete failed: ' + err.message);
+  }
+}
+</script>
+</body>
+</html>

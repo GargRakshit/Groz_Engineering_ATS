@@ -1,0 +1,303 @@
+<!DOCTYPE html>
+<html lang="en" data-theme="light">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Login — Application Tracking System</title>
+  <script>(function(){var t=localStorage.getItem('rp-theme')||'light';document.documentElement.setAttribute('data-theme',t);})()</script>
+  <style>
+    :root {
+      --bg:          #f4f4f4;
+      --surface:     #ffffff;
+      --surface-alt: #f9f9f9;
+      --border:      #e0e0e0;
+      --text-1:      #1a1a1a;
+      --text-2:      #666666;
+      --accent:      #f47920;
+      --accent-h:    #d46010;
+      --nav-bg:      #000000;
+      --nav-text:    #f0ece6;
+      --input-bg:    #ffffff;
+      --input-border:#d0d0d0;
+      --card-shadow: 0 1px 3px rgba(0,0,0,.08);
+      --error-bg:    #fdecea;
+      --error-text:  #b71c1c;
+      --error-border:#f5c6c6;
+    }
+    [data-theme="dark"] {
+      --bg:          #000000;
+      --surface:     #181818;
+      --border:      #2a2a2a;
+      --text-1:      #f0ece6;
+      --text-2:      #9a9089;
+      --accent:      #f47920;
+      --accent-h:    #d46010;
+      --nav-bg:      #000000;
+      --nav-text:    #f0ece6;
+      --input-bg:    #181818;
+      --input-border:#2a2a2a;
+      --card-shadow: none;
+      --error-bg:    #1a0600;
+      --error-text:  #ff8c8c;
+      --error-border:#5a2020;
+    }
+
+    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+    body {
+      font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", system-ui, sans-serif;
+      background: var(--bg);
+      color: var(--text-1);
+      min-height: 100vh;
+      display: flex;
+      flex-direction: column;
+    }
+
+    nav {
+      background: var(--nav-bg);
+      color: var(--nav-text);
+      padding: 0 1.25rem;
+      min-height: 58px;
+      display: flex;
+      align-items: center;
+      gap: 0.75rem;
+      border-bottom: 1px solid #1a1a1a;
+    }
+    .nav-brand-logo {
+      display: flex;
+      align-items: center;
+      flex-shrink: 0;
+    }
+    .nav-brand-logo img { display: block; width: 200px; height: auto; }
+    .brand {
+      color: var(--nav-text);
+      text-decoration: none;
+      font-weight: 700;
+      font-size: 0.95rem;
+      letter-spacing: -0.01em;
+    }
+    .nav-spacer { flex: 1; }
+    .theme-btn {
+      width: 32px; height: 32px;
+      border-radius: 7px;
+      border: 1px solid rgba(244,121,32,0.28);
+      background: rgba(244,121,32,0.08);
+      color: var(--nav-text);
+      cursor: pointer;
+      display: flex; align-items: center; justify-content: center;
+      transition: background 0.15s, border-color 0.15s;
+      flex-shrink: 0;
+    }
+    .theme-btn:hover { background: rgba(244,121,32,0.18); border-color: rgba(244,121,32,.45); }
+    .icon-moon { display: flex; }
+    .icon-sun  { display: none; }
+    [data-theme="dark"] .icon-moon { display: none; }
+    [data-theme="dark"] .icon-sun  { display: flex; }
+
+    .login-wrap {
+      flex: 1;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      padding: 2rem 1rem;
+    }
+
+    .login-card {
+      background: var(--surface);
+      border: 1px solid var(--border);
+      border-radius: 12px;
+      box-shadow: var(--card-shadow);
+      padding: 2.25rem 2rem;
+      width: 100%;
+      max-width: 380px;
+    }
+
+    .login-logo {
+      display: flex;
+      align-items: center;
+      gap: 0.6rem;
+      margin-bottom: 1.5rem;
+    }
+    .login-logo-mark {
+      display: flex;
+      align-items: center;
+    }
+    .login-logo-mark img { display: block; width: 140px; height: auto; }
+    .login-logo-text {
+      font-size: 1.1rem;
+      font-weight: 700;
+      color: var(--text-1);
+    }
+
+    h1 {
+      font-size: 1.4rem;
+      font-weight: 700;
+      color: var(--text-1);
+      margin-bottom: 0.3rem;
+    }
+    .subtitle {
+      font-size: 0.85rem;
+      color: var(--text-2);
+      margin-bottom: 1.75rem;
+    }
+
+    .error-banner {
+      border-radius: 7px;
+      padding: 0.6rem 0.85rem;
+      font-size: 0.85rem;
+      margin-bottom: 1.25rem;
+      line-height: 1.5;
+    }
+    .error-banner.err {
+      background: var(--error-bg);
+      color: var(--error-text);
+      border: 1px solid var(--error-border);
+    }
+    .error-banner.warn {
+      background: #fff8e1;
+      color: #7a5200;
+      border: 1px solid #ffe082;
+    }
+    [data-theme="dark"] .error-banner.warn {
+      background: #1a1200;
+      color: #ffc96e;
+      border: 1px solid #5a3e00;
+    }
+    .btn-force {
+      display: inline-block;
+      margin-top: 0.5rem;
+      padding: 0.4rem 0.75rem;
+      background: linear-gradient(135deg, var(--accent), var(--accent-h));
+      color: #111;
+      border: none;
+      border-radius: 6px;
+      font-size: 0.82rem;
+      font-weight: 600;
+      cursor: pointer;
+      font-family: inherit;
+    }
+    .btn-force:hover { opacity: 0.9; }
+
+    .field { margin-bottom: 1rem; }
+    label {
+      display: block;
+      font-size: 0.82rem;
+      font-weight: 600;
+      color: var(--text-2);
+      margin-bottom: 0.35rem;
+    }
+    input[type="text"], input[type="password"] {
+      width: 100%;
+      padding: 0.55rem 0.75rem;
+      border: 1px solid var(--input-border);
+      border-radius: 7px;
+      background: var(--input-bg);
+      color: var(--text-1);
+      font-size: 0.9rem;
+      outline: none;
+      transition: border-color .15s;
+    }
+    input:focus {
+      border-color: var(--accent);
+      box-shadow: 0 0 0 3px color-mix(in srgb, var(--accent) 20%, transparent);
+    }
+
+    .btn-login {
+      width: 100%;
+      padding: 0.65rem;
+      background: linear-gradient(135deg, var(--accent), var(--accent-h));
+      color: #111;
+      border: none;
+      border-radius: 7px;
+      font-size: 0.9rem;
+      font-weight: 600;
+      cursor: pointer;
+      margin-top: 1.25rem;
+      transition: opacity .15s;
+    }
+    .btn-login:hover { opacity: 0.95; }
+    .btn-login:active { opacity: 0.75; }
+  </style>
+</head>
+<body>
+  <nav>
+    <div class="nav-brand-logo" aria-label="Groz Engineering">
+      <img src="/images/MicrosoftTeams-image.png" alt="Groz Engineering logo">
+    </div>
+    <span class="brand">Application Tracking System</span>
+    <span class="nav-spacer"></span>
+    <button class="theme-btn" onclick="toggleTheme()" title="Toggle theme" aria-label="Toggle dark mode">
+      <span class="icon-moon">
+        <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+          <path d="M21 12.79A9 9 0 1 1 11.21 3 7 7 0 0 0 21 12.79z"/>
+        </svg>
+      </span>
+      <span class="icon-sun">
+        <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+          <circle cx="12" cy="12" r="5"/>
+          <line x1="12" y1="1" x2="12" y2="3"/>
+          <line x1="12" y1="21" x2="12" y2="23"/>
+          <line x1="4.22" y1="4.22" x2="5.64" y2="5.64"/>
+          <line x1="18.36" y1="18.36" x2="19.78" y2="19.78"/>
+          <line x1="1" y1="12" x2="3" y2="12"/>
+          <line x1="21" y1="12" x2="23" y2="12"/>
+          <line x1="4.22" y1="19.78" x2="5.64" y2="18.36"/>
+          <line x1="18.36" y1="5.64" x2="19.78" y2="4.22"/>
+        </svg>
+      </span>
+    </button>
+  </nav>
+
+  <div class="login-wrap">
+    <div class="login-card">
+      <div class="login-logo">
+        <div class="login-logo-mark">
+          <img src="/images/MicrosoftTeams-image.png" alt="Groz Engineering logo">
+        </div>
+        <span class="login-logo-text">Application Tracking System</span>
+      </div>
+
+      <h1>Sign in</h1>
+      <p class="subtitle">Enter your credentials to access the dashboard.</p>
+
+      {% if error == "invalid_credentials" %}
+      <div class="error-banner err">Invalid username or password.</div>
+      {% elif error == "session_expired" %}
+      <div class="error-banner warn">Your session expired due to inactivity. Please sign in again.</div>
+      {% elif error == "already_logged_in" %}
+      <div class="error-banner warn">
+        This account is already signed in from another browser or window.<br>
+        Re-enter your password to sign in and end the other session.
+      </div>
+      {% endif %}
+
+      <form method="post" action="/login">
+        <div class="field">
+          <label for="username">Username</label>
+          <input type="text" id="username" name="username" autocomplete="username"
+                 value="{{ username or '' }}" autofocus required>
+        </div>
+        <div class="field">
+          <label for="password">Password</label>
+          <input type="password" id="password" name="password" autocomplete="current-password" required>
+        </div>
+        {% if error == "already_logged_in" %}
+        <input type="hidden" name="force" value="1">
+        <button type="submit" class="btn-login">Sign in anyway</button>
+        {% else %}
+        <button type="submit" class="btn-login">Sign in</button>
+        {% endif %}
+      </form>
+    </div>
+  </div>
+
+  <script>
+    function toggleTheme() {
+      var html = document.documentElement;
+      var next = html.getAttribute('data-theme') === 'dark' ? 'light' : 'dark';
+      html.setAttribute('data-theme', next);
+      localStorage.setItem('rp-theme', next);
+    }
+  </script>
+</body>
+</html>

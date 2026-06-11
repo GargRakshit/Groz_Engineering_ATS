@@ -1,0 +1,40 @@
+# ── Secrets & environment ──────────────────────────────────────────────────
+.env
+*.env.*
+
+# ── Claude / AI assistant files ───────────────────────────────────────────
+CLAUDE.md
+plan.md
+.claude/
+.mcp.json
+.code-review-graph/
+
+# ── Python ────────────────────────────────────────────────────────────────
+__pycache__/
+*.py[cod]
+*.pyo
+venv/
+.venv/
+.pytest_cache/
+*.egg-info/
+dist/
+build/
+
+# ── Large raw corpus data (11 GB — re-download from Kaggle/ESCO/ConceptNet) ──
+Data/Corpus/
+
+# ── Runtime data — sensitive or machine-specific ──────────────────────────
+# Archived resume files (personal data — never commit)
+Archive/
+# JD extraction cache
+JDCache/
+# SQLite fallback DB (production uses MySQL)
+*.db
+
+# ── OS / editor ───────────────────────────────────────────────────────────
+.DS_Store
+Thumbs.db
+desktop.ini
+.idea/
+.vscode/
+*.swp

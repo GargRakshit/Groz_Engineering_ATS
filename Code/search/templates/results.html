@@ -1,0 +1,122 @@
+{% extends "base.html" %}
+{% block title %}Results — Resume Search{% endblock %}
+
+{% block breadcrumb %}
+<span class="breadcrumb">
+  <span>/</span>
+  <a href="/">Search</a>
+</span>
+{% endblock %}
+
+{% block content %}
+
+{# ── Filter summary bar ── #}
+<div class="results-meta">
+  <div class="results-count">
+    {% if total == 0 %}
+      No results
+    {% else %}
+      <strong>{{ total }}</strong> result{{ 's' if total != 1 else '' }}
+    {% endif %}
+    {% if q %} &middot; query: <strong>"{{ q }}"</strong>{% endif %}
+    {% if min_score %} &middot; score &ge; <strong>{{ min_score }}%</strong>{% endif %}
+    {% if min_years %} &middot; exp &ge; <strong>{{ min_years }} yrs</strong>{% endif %}
+    {% if jd_id %}
+      {% for jd in jds %}{% if jd.id == jd_id %} &middot; JD: <strong>{{ jd.name }}</strong>{% endif %}{% endfor %}
+    {% endif %}
+  </div>
+  <a href="/" class="btn-sm">New search</a>
+</div>
+
+{# ── Results table ── #}
+{% if results %}
+<div class="table-wrap">
+  <table>
+    <thead>
+      <tr>
+        <th class="col-rank">#</th>
+        <th>Candidate</th>
+        <th>Score</th>
+        <th class="col-yrs">Yrs Exp</th>
+        <th>Skills</th>
+        <th class="col-badges">Exp</th>
+        <th class="col-badges">Edu</th>
+        <th class="col-badges">Cert</th>
+      </tr>
+    </thead>
+    <tbody>
+      {% for r in results %}
+      {% set score = r.ats_score or 0 %}
+      {% set pct = (score * 100) | int %}
+      {% set tier = 'high' if score >= 0.7 else ('mid' if score >= 0.45 else 'low') %}
+      {% set bd = r.score_breakdown or {} %}
+      {% set years = bd.get('years_experience') %}
+      {% set resume_url = '/resume/' ~ r.id %}
+      {% if r.match_jd_id %}{% set resume_url = resume_url ~ '?jd_id=' ~ r.match_jd_id ~ '&back=' ~ back_query %}{% else %}{% set resume_url = resume_url ~ '?back=' ~ back_query %}{% endif %}
+
+      <tr>
+        <td class="col-rank">{{ loop.index }}</td>
+        <td>
+          <a href="{{ resume_url }}">{{ r.candidate_name or r.source_file }}</a>
+        </td>
+        <td>
+          <div class="score-wrap">
+            <div class="score-track">
+              <div class="score-fill {{ tier }}" data-pct="{{ pct }}"></div>
+            </div>
+            <span class="score-pct {{ tier }}">{{ pct }}%</span>
+          </div>
+        </td>
+        <td class="col-yrs">
+          {% if years is not none %}{{ "%.1f"|format(years) }}{% else %}—{% endif %}
+        </td>
+        <td class="col-skills">{{ r.skills_list[:5] | join(', ') }}{% if r.skills_list | length > 5 %}…{% endif %}</td>
+        <td class="col-badges">
+          {% if bd.get('meets_experience') == true %}
+            <span class="badge badge-ok">✓</span>
+          {% elif bd.get('meets_experience') == false %}
+            <span class="badge badge-fail">✗</span>
+          {% else %}
+            <span class="badge badge-na">—</span>
+          {% endif %}
+        </td>
+        <td class="col-badges">
+          {% if bd.get('education_met') == true %}
+            <span class="badge badge-ok">✓</span>
+          {% elif bd.get('education_met') == false %}
+            <span class="badge badge-fail">✗</span>
+          {% else %}
+            <span class="badge badge-na">—</span>
+          {% endif %}
+        </td>
+        <td class="col-badges">
+          {% if bd.get('certifications_met') == true %}
+            <span class="badge badge-ok">✓</span>
+          {% elif bd.get('certifications_met') == false %}
+            <span class="badge badge-fail">✗</span>
+          {% else %}
+            <span class="badge badge-na">—</span>
+          {% endif %}
+        </td>
+      </tr>
+      {% endfor %}
+    </tbody>
+  </table>
+</div>
+
+{% else %}
+<div class="table-wrap">
+  <div class="empty-state">
+    <strong>No candidates match your filters.</strong>
+    <p>Try broadening your search or lowering the score threshold.</p>
+  </div>
+</div>
+{% endif %}
+
+<script>
+document.querySelectorAll('.score-fill[data-pct]').forEach(function(el) {
+  el.style.width = (el.dataset.pct || 0) + '%';
+});
+</script>
+
+{% endblock %}

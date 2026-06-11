@@ -1,0 +1,232 @@
+{% extends "base.html" %}
+{% set c = data.candidate %}
+{% set bd = data.score_breakdown or {} %}
+{% set parsed = data.parsed %}
+{% set score = bd.get('overall') %}
+
+{% block title %}{{ c.full_name or 'Candidate' }} — Resume{% endblock %}
+
+{% block breadcrumb %}
+<span class="breadcrumb">
+  <span>/</span>
+  <a href="{{ back_url }}">Search</a>
+  <span>/</span>
+  <span>{{ c.full_name or 'Candidate' }}</span>
+</span>
+{% endblock %}
+
+{% block content %}
+
+{# ── Candidate header ── #}
+<div class="card cand-header">
+  <div class="cand-name">{{ c.full_name or 'Unknown' }}</div>
+  <div class="cand-meta">
+    {% if c.email %}<span>{{ c.email }}</span>{% endif %}
+    {% if c.phone %}<span>{{ c.phone }}</span>{% endif %}
+    {% if c.location %}<span>{{ c.location }}</span>{% endif %}
+    {% if c.linkedin %}<a href="{{ c.linkedin }}" target="_blank" rel="noopener">LinkedIn</a>{% endif %}
+    {% if c.github %}<a href="{{ c.github }}" target="_blank" rel="noopener">GitHub</a>{% endif %}
+    {% if c.portfolio %}<a href="{{ c.portfolio }}" target="_blank" rel="noopener">Portfolio</a>{% endif %}
+  </div>
+</div>
+
+{# ── Score card ── #}
+{% if bd %}
+<div class="card section">
+  <h2>ATS Score</h2>
+  <div style="display:flex; align-items:baseline; gap:0.5rem; margin-bottom:1.25rem;">
+    <span style="font-size:2.5rem; font-weight:800; letter-spacing:-0.03em;">
+      {% if score is not none %}{{ (score * 100)|int }}%{% else %}—{% endif %}
+    </span>
+    <span style="font-size:0.8rem; color:var(--text-3); font-weight:600; text-transform:uppercase; letter-spacing:0.06em;">Overall</span>
+  </div>
+  <div class="score-grid">
+    {% if bd.get('match_score') is not none %}
+    <div class="score-item">
+      <label>Match Score</label>
+      <span class="val">{{ "%.2f"|format(bd.get('match_score')) }}</span>
+    </div>
+    {% endif %}
+    {% if bd.get('years_experience') is not none %}
+    <div class="score-item">
+      <label>Years Exp</label>
+      <span class="val">{{ "%.1f"|format(bd.get('years_experience')) }}</span>
+    </div>
+    {% endif %}
+    {% if bd.get('meets_experience') is not none %}
+    <div class="score-item">
+      <label>Experience</label>
+      <span class="val">
+        {% if bd.get('meets_experience') == true %}<span class="badge badge-ok">Met</span>
+        {% else %}<span class="badge badge-fail">Not met</span>{% endif %}
+      </span>
+    </div>
+    {% endif %}
+    {% if bd.get('education_met') is not none %}
+    <div class="score-item">
+      <label>Education</label>
+      <span class="val">
+        {% if bd.get('education_met') == true %}<span class="badge badge-ok">Met</span>
+        {% else %}<span class="badge badge-fail">Not met</span>{% endif %}
+      </span>
+    </div>
+    {% endif %}
+    {% if bd.get('certifications_met') is not none %}
+    <div class="score-item">
+      <label>Certifications</label>
+      <span class="val">
+        {% if bd.get('certifications_met') == true %}<span class="badge badge-ok">Met</span>
+        {% else %}<span class="badge badge-fail">Not met</span>{% endif %}
+      </span>
+    </div>
+    {% endif %}
+  </div>
+</div>
+{% endif %}
+
+{# ── Matched / Missing skills ── #}
+{% if data.matched_skills or data.missing_skills %}
+<div class="detail-grid">
+  {% if data.matched_skills %}
+  <div class="card section">
+    <h2>Matched Skills ({{ data.matched_skills | length }})</h2>
+    <div class="pills">
+      {% for s in data.matched_skills %}<span class="pill pill-matched">{{ s }}</span>{% endfor %}
+    </div>
+  </div>
+  {% endif %}
+  {% if data.missing_skills %}
+  <div class="card section">
+    <h2>Missing Skills ({{ data.missing_skills | length }})</h2>
+    <div class="pills">
+      {% for s in data.missing_skills %}<span class="pill pill-missing">{{ s }}</span>{% endfor %}
+    </div>
+  </div>
+  {% endif %}
+</div>
+{% endif %}
+
+{# ── All Skills (when no match data) ── #}
+{% set all_skills = parsed.get('skills', []) %}
+{% if all_skills and not (data.matched_skills or data.missing_skills) %}
+<div class="card section">
+  <h2>Skills ({{ all_skills | length }})</h2>
+  <div class="pills">
+    {% for s in all_skills %}<span class="pill">{{ s }}</span>{% endfor %}
+  </div>
+</div>
+{% endif %}
+
+{# ── Summary ── #}
+{% set summary = parsed.get('summary') %}
+{% if summary %}
+<div class="card section">
+  <h2>Summary</h2>
+  <p class="summary-text">{{ summary }}</p>
+</div>
+{% endif %}
+
+{# ── Experience ── #}
+{% set experience = parsed.get('experience', []) %}
+{% if experience %}
+<div class="card section">
+  <h2>Experience</h2>
+  {% for exp in experience %}
+  {% set role = exp.get('role') %}
+  {% set company = exp.get('company') %}
+  {% set start = exp.get('start_date') %}
+  {% set end = exp.get('end_date') %}
+  {% set is_current = exp.get('is_current') %}
+  {% set desc = exp.get('description', []) %}
+  <div class="exp-entry">
+    {% if role %}<div class="exp-role">{{ role }}</div>{% endif %}
+    {% if company %}<div class="exp-company">{{ company }}</div>{% endif %}
+    {% if start or end or is_current %}
+    <div class="exp-dates">
+      {{ start or '?' }} – {{ 'Present' if is_current else (end or '?') }}
+    </div>
+    {% endif %}
+    {% if desc %}
+    <ul class="exp-desc">
+      {% for item in desc %}{% if item %}<li>{{ item }}</li>{% endif %}{% endfor %}
+    </ul>
+    {% endif %}
+  </div>
+  {% endfor %}
+</div>
+{% endif %}
+
+{# ── Education ── #}
+{% set education = parsed.get('education', []) %}
+{% if education %}
+<div class="card section">
+  <h2>Education</h2>
+  {% for edu in education %}
+  {% set degree = edu.get('degree') %}
+  {% set field = edu.get('field_of_study') %}
+  {% set institution = edu.get('institution') %}
+  {% set start = edu.get('start_date') %}
+  {% set end = edu.get('end_date') %}
+  {% set grade = edu.get('grade') %}
+  <div class="edu-entry">
+    {% if degree or field %}
+    <div class="edu-degree">
+      {{ degree or '' }}{% if degree and field %} — {% endif %}{{ field or '' }}
+    </div>
+    {% endif %}
+    {% if institution %}<div class="edu-inst">{{ institution }}</div>{% endif %}
+    {% if start or end or grade %}
+    <div class="edu-dates">
+      {% if start or end %}{{ start or '' }}{% if start and end %} – {% endif %}{{ end or '' }}{% endif %}
+      {% if grade %} &middot; {{ grade }}{% endif %}
+    </div>
+    {% endif %}
+  </div>
+  {% endfor %}
+</div>
+{% endif %}
+
+{# ── Certifications ── #}
+{% set certs = parsed.get('certifications', []) %}
+{% if certs %}
+<div class="card section">
+  <h2>Certifications</h2>
+  <ul class="certs-list">
+    {% for cert in certs %}{% if cert %}<li>{{ cert }}</li>{% endif %}{% endfor %}
+  </ul>
+</div>
+{% endif %}
+
+{# ── Projects ── #}
+{% set projects = parsed.get('projects', []) %}
+{% if projects %}
+<div class="card section">
+  <h2>Projects</h2>
+  {% for proj in projects %}
+  {% set name = proj.get('name') %}
+  {% set link = proj.get('link') %}
+  {% set techs = proj.get('technologies_used', []) %}
+  {% set pdesc = proj.get('description', []) %}
+  <div class="exp-entry">
+    {% if name %}
+    <div class="exp-role">
+      {% if link %}<a href="{{ link }}" target="_blank" rel="noopener">{{ name }}</a>
+      {% else %}{{ name }}{% endif %}
+    </div>
+    {% endif %}
+    {% if techs %}
+    <div class="exp-company" style="font-size:.82rem;color:var(--text-3);margin-top:.15rem;">
+      {{ techs | join(', ') }}
+    </div>
+    {% endif %}
+    {% if pdesc %}
+    <ul class="exp-desc">
+      {% for item in pdesc %}{% if item %}<li>{{ item }}</li>{% endif %}{% endfor %}
+    </ul>
+    {% endif %}
+  </div>
+  {% endfor %}
+</div>
+{% endif %}
+
+{% endblock %}
