@@ -8,13 +8,13 @@ A self-hosted applicant tracking system that parses resumes and job descriptions
 
 ## Work in Progress
 
-This project is being built in stages, moving progressively away from LLM-heavy processing toward fully deterministic, API-free scoring.
+This project was built in stages, moving progressively away from LLM-heavy processing toward fully deterministic, API-free scoring.
 
-**Where it started:** The original system had the LLM do everything — extract resume data, match skills, score candidates, and justify the match. This was fast to build but non-deterministic (the same resume could score differently on two runs), expensive (long prompts), and hard to audit.
+**Where it started:** The original system had the LLM do everything — extract resume data, match skills, score candidates, and justify the match. This was fast to build but non-deterministic, expensive, and hard to audit.
 
-**Where it is now:** The LLM is responsible for extraction only — one call per resume, one call per job description. All matching, scoring, and ranking is done in Python with a hybrid BM25 + cross-encoder pipeline that produces deterministic results.
+**Where it is now:** The LLM is responsible for extraction only — one call per resume, one call per job description. All matching, scoring, and ranking is done in Python with a per-phrase Cross-Encoder pipeline that produces deterministic results.
 
-**Where it is going:** Eliminate the LLM dependency for extraction too, replacing it with a local pipeline. The goal is a system that works fully offline with zero API calls — useful in environments where data cannot leave the premises or with no API calls budget.
+**Where it is going:** Eliminate the LLM dependency for extraction too, replacing it with a local pipeline. The goal is a system that works fully offline with zero API calls.
 
 | Stage | Status | What the LLM does |
 |---|---|---|
@@ -27,9 +27,12 @@ This project is being built in stages, moving progressively away from LLM-heavy 
 ## Features
 
 - **Resume parsing** — Extracts candidate info, skills, experience, education, certifications, and qualifications from PDF and DOCX files
-- **JD parsing** — Extracts required/preferred skills, experience requirements, education level, and certifications from job description documents
-- **Hybrid scoring** — BM25 (lexical, corpus-IDF-weighted) + cross-encoder (`gte-reranker-modernbert-base`, 8192-token context) produce a single deterministic ATS score
-- **Knowledge-graph expansion** — BM25 inputs are expanded with synonyms from ESCO, O\*NET, and ConceptNet (117k entries), catching abbreviations and domain-specific aliases
+- **JD parsing** — Extracts required/preferred skills, key responsibilities, experience requirements, education level, and certifications from job description documents
+- **Per-phrase CE scoring** — Every JD requirement phrase is scored independently against the full resume text via a batched cross-encoder call (`gte-reranker-modernbert-base`, 8192-token context). Score and matched/missing pills are derived from the same computation, so they always agree.
+- **Calibrated scoring** — Raw CE sigmoid is linearly mapped to [0, 1] over the empirical output band [0.65, 0.93]. A term-match fallback raises scores for domain synonyms the CE misses (e.g. "Fettling" → resume says "trimming press").
+- **Relevant-years experience** — Only experience in roles on the JD's domain counts toward the score, detected via IDF-filtered domain tokens and KG expansion.
+- **Knowledge-graph expansion** — 117k synonym entries (ESCO + O\*NET + ConceptNet) used for experience relevance detection and the term-match fallback.
+- **ATS score formula** — `0.60 × match_score + 0.40 × min(relevant_years / 10, 1.0)`
 - **Web UI** — Candidate cards, filters (name, score, years, status, JD), upload overlay, JD manager, per-resume detail view, dark/light mode
 - **Multi-provider LLM** — Groq, Gemini, OpenRouter, Ollama — switch with a single env var
 - **Session auth** — Login required; one active session per user; 15-minute inactivity timeout
@@ -44,9 +47,9 @@ Resume PDF/DOCX ──► extract text ──► LLM (extraction only) ──►
 JD PDF/DOCX ──────► extract text ──► LLM (cached by SHA-256) ──► JDRequirements
                                                                         │
                      ┌──────── matching/scoring (pure Python) ─────────┘
-                     │  BM25 (corpus IDF) + Cross-Encoder reranker
-                     │  KG synonym expansion (ESCO + O*NET + ConceptNet)
-                     │  Experience date math · Education degree level
+                     │  Per-phrase Cross-Encoder (gte-reranker-modernbert-base)
+                     │  Unified phrase pool: skills + responsibilities + qualifications
+                     │  CE calibration · term-match fallback · relevant-years calc
                      └──────────────────────────────────────────────────
                                           │
                                MySQL (SQLAlchemy 2.0)
@@ -63,7 +66,7 @@ JD PDF/DOCX ──────► extract text ──► LLM (cached by SHA-256)
 | Document extraction | PyMuPDF, python-docx, Tesseract OCR |
 | Schema validation | Pydantic v2 |
 | LLM providers | google-genai, openai-compat (Groq), ollama, urllib (OpenRouter) |
-| NLP / scoring | spaCy `en_core_web_sm`, `cross-encoder/gte-reranker-modernbert-base` (sentence-transformers) |
+| NLP / scoring | spaCy `en_core_web_sm`, `Alibaba-NLP/gte-reranker-modernbert-base` (sentence-transformers) |
 | Database | SQLAlchemy 2.0, MySQL (PyMySQL) |
 | Web UI | FastAPI, Jinja2, vanilla JS |
 
@@ -82,8 +85,8 @@ JD PDF/DOCX ──────► extract text ──► LLM (cached by SHA-256)
 
 ```bash
 # 1. Clone and enter the project
-git clone https://github.com/<your-username>/<repo-name>.git
-cd resume-parser
+git clone https://github.com/GargRakshit/Groz_Engineering_ATS.git
+cd Groz_Engineering_ATS
 
 # 2. Create and activate a virtual environment
 python -m venv venv
@@ -117,8 +120,9 @@ GROQ_API_KEY=gsk_...
 # OPENROUTER_API_KEY=sk-or-...
 # OLLAMA_MODEL=llama3.2
 
-# Web UI session key — change this
-SECRET_KEY=change-me-to-a-random-string
+# Web UI credentials (overrides default admin/admin123)
+APP_USERNAME=admin
+APP_PASSWORD=your_strong_password
 
 # Windows only — path to Tesseract (only needed for scanned PDFs)
 # TESSERACT_CMD=C:\Program Files\Tesseract-OCR\tesseract.exe
@@ -130,7 +134,7 @@ SECRET_KEY=change-me-to-a-random-string
 uvicorn Code.search.app:app --host 0.0.0.0 --port 8000
 ```
 
-Open `http://localhost:8000`. Default login: `admin` / `admin123` (change immediately via MySQL).
+Open `http://localhost:8000`. Default login: `admin` / `admin123` — **change this before use** via `APP_USERNAME` / `APP_PASSWORD` in `.env`.
 
 ---
 
@@ -141,7 +145,7 @@ The `Data/` folder ships with two pre-built derived files (`kg_expansions.json` 
 If you want to rebuild them from scratch (e.g. to update the IDF weights with a newer job postings dataset), download the following:
 
 ### 1. LinkedIn Job Postings 2023–24 (IDF weights)
-Used to compute corpus-level IDF values for BM25 scoring.
+Used to compute corpus-level IDF values for domain-token detection.
 
 **Download:** [kaggle.com/datasets/arshkon/linkedin-job-postings](https://www.kaggle.com/datasets/arshkon/linkedin-job-postings)
 
@@ -171,10 +175,6 @@ File: `conceptnet-assertions-5.7.0.csv.gz`
 
 Place the extracted CSV in `Data/Corpus/conceptnet-assertions-5.7.0.csv/`.
 
-### Rebuilding the derived files
-
-Once the source data is in place, run the build scripts (coming as part of Stage 3 tooling — for now, contact the maintainer for the scripts used to generate the current `Data/*.json` files).
-
 ---
 
 ## LLM Providers
@@ -196,17 +196,17 @@ Set `LLM_PROVIDER=groq` (or `gemini` / `openrouter` / `ollama`) in `.env`.
 Resume Parser/
 ├── Code/
 │   ├── parser/         # Text extraction, LLM prompts, provider implementations
-│   ├── matching/       # BM25+CE scoring, KG expansion, experience/education checks
-│   ├── db/             # SQLAlchemy models, MySQL session, LIKE-based search
+│   ├── matching/       # Per-phrase CE scoring, KG expansion, experience/education checks
+│   ├── db/             # SQLAlchemy models (5 tables), MySQL session, LIKE-based search
 │   ├── search/         # FastAPI app + Jinja2 templates
-│   ├── scoring.py      # ATS score formula
+│   ├── scoring.py      # ATS score formula (0.60 × match + 0.40 × relevant_years)
 │   └── run.py          # CLI batch processor
 ├── Data/
 │   ├── kg_expansions.json   # Pre-built KG synonym map (117k entries)
-│   └── idf_weights.json     # Pre-built BM25 IDF weights
+│   └── idf_weights.json     # Pre-built IDF weights (LinkedIn corpus)
 ├── Archive/            # Archived resume and JD files (gitignored — personal data)
 ├── JDCache/            # JD extraction cache keyed by SHA-256 (gitignored)
-├── DocWork/            # Documentation, architecture diagrams
+├── DocWork/            # Technical documentation
 └── requirements.txt
 ```
 
@@ -228,7 +228,7 @@ python -m Code.run --jd jd.pdf resume1.pdf resume2.docx
 
 ```bash
 python -m pytest Code/tests/ -v
-# 66 tests — matching, scoring, database
+# 91 tests — matching, scoring, database, pipeline
 ```
 
 ---
