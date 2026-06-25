@@ -881,7 +881,7 @@
       <div class="cand-meta">
         {% if r.email %}<span>{{ r.email }}</span>{% endif %}
         {% if r.location %}{% if r.email %}<span class="meta-sep">·</span>{% endif %}<span>{{ r.location }}</span>{% endif %}
-        {% if years is not none %}{% if r.email or r.location %}<span class="meta-sep">·</span>{% endif %}<span>{% if rel_years is not none %}{{ "%.1f"|format(rel_years) }} / {{ "%.1f"|format(years) }} yrs relevant{% else %}{{ "%.1f"|format(years) }} yrs exp{% endif %}</span>{% endif %}
+        {% if years is not none %}{% if r.email or r.location %}<span class="meta-sep">·</span>{% endif %}<span class="cand-years">{% if rel_years is not none %}{{ "%.1f"|format(rel_years) }} / {{ "%.1f"|format(years) }} yrs relevant{% else %}{{ "%.1f"|format(years) }} yrs exp{% endif %}</span>{% endif %}
       </div>
       {% if r.skills_list %}
       <div class="cand-skills">{{ r.skills_list|join(', ') }}{% if r.skills_list|length == 6 %}…{% endif %}</div>
@@ -956,20 +956,25 @@ function buildCard(r) {
   const name = r.candidate_name || 'Unknown';
   const [bg, fg] = _ac(name);
   const bd   = r.score_breakdown || {};
-  const yrs  = bd.years_experience;
-  const relYrs = bd.relevant_years;
-  const filterYrs = relYrs != null ? relYrs : yrs;
   const jdId = document.getElementById('jd-filter').value;
   const all  = r.all_scores || {};
-  const score = jdId && all[jdId] != null ? all[jdId] : (r.ats_score != null ? r.ats_score : null);
+  // all[jdId] is now {s, ry, ty}; fall back to flat number for old-format entries
+  const entry = jdId && all[jdId] != null ? all[jdId] : null;
+  const score = entry != null ? (typeof entry === 'object' ? entry.s : entry)
+                              : (r.ats_score != null ? r.ats_score : null);
+  const relYrs = (entry != null && typeof entry === 'object' && entry.ry != null)
+               ? entry.ry : bd.relevant_years;
+  const yrs    = (entry != null && typeof entry === 'object' && entry.ty != null)
+               ? entry.ty : bd.years_experience;
+  const filterYrs = relYrs != null ? relYrs : yrs;
 
   const meta = [];
   if (r.email)    meta.push(`<span>${escHtml(r.email)}</span>`);
   if (r.location) meta.push(`<span>${escHtml(r.location)}</span>`);
   if (yrs != null) {
     meta.push(relYrs != null
-      ? `<span>${relYrs.toFixed(1)} / ${yrs.toFixed(1)} yrs relevant</span>`
-      : `<span>${yrs.toFixed(1)} yrs exp</span>`);
+      ? `<span class="cand-years">${relYrs.toFixed(1)} / ${yrs.toFixed(1)} yrs relevant</span>`
+      : `<span class="cand-years">${yrs.toFixed(1)} yrs exp</span>`);
   }
   const metaHtml = meta.map((s,i)=>(i>0?'<span class="meta-sep">·</span>':'')+s).join('');
 
@@ -1138,10 +1143,26 @@ function updateScores() {
   document.querySelectorAll('.cand-card').forEach(card => {
     let scores = {};
     try { scores = JSON.parse(card.dataset.scores || '{}'); } catch(e) {}
-    const score = jdId ? (scores[jdId] != null ? scores[jdId] : null) : null;
+    const entry = jdId ? (scores[jdId] ?? null) : null;
+    // entry is {s, ry, ty} (new) or a plain number (old format) or null
+    const score  = entry != null ? (typeof entry === 'object' ? entry.s  : entry) : null;
+    const relYrs = entry != null && typeof entry === 'object' ? entry.ry : null;
+    const totYrs = entry != null && typeof entry === 'object' ? entry.ty : null;
+
     card.dataset.score = score != null ? score : '';
+    if (relYrs != null) card.dataset.years = relYrs;
+    else if (totYrs != null) card.dataset.years = totYrs;
+
     const scoreEl = card.querySelector('.score-val');
     if (scoreEl) scoreEl.textContent = score != null ? Math.round(score * 100) : '—';
+
+    const yearsEl = card.querySelector('.cand-years');
+    if (yearsEl && (relYrs != null || totYrs != null)) {
+      yearsEl.textContent = relYrs != null && totYrs != null
+        ? `${relYrs.toFixed(1)} / ${totYrs.toFixed(1)} yrs relevant`
+        : `${(totYrs ?? relYrs).toFixed(1)} yrs exp`;
+    }
+
     // Bug 2: keep the report link in sync with the selected JD
     const link = card.querySelector('.cand-name a');
     if (link) {
@@ -1482,7 +1503,7 @@ document.getElementById('jd-form').addEventListener('submit', async function(e) 
         if (card) {
           let sc = {};
           try { sc = JSON.parse(card.dataset.scores || '{}'); } catch(_) {}
-          sc[String(jdData.jd_id)] = d.score;
+          sc[String(jdData.jd_id)] = {s: d.score, ry: d.ry ?? null, ty: d.ty ?? null};
           card.dataset.scores = JSON.stringify(sc);
         }
       }
@@ -1643,12 +1664,20 @@ async function rescoreSelected() {
           if (!card) return;
           let scores = {};
           try { scores = JSON.parse(card.dataset.scores || '{}'); } catch(e) {}
-          scores[String(jdId)] = r.score;
+          scores[String(jdId)] = {s: r.score, ry: r.ry ?? null, ty: r.ty ?? null};
           if (!scores.best || r.score > scores.best) scores.best = r.score;
           card.dataset.scores = JSON.stringify(scores);
           card.dataset.score  = r.score;
-          const el = card.querySelector('.score-val');
-          if (el) el.textContent = Math.round(r.score * 100);
+          if (r.ry != null) card.dataset.years = r.ry;
+          else if (r.ty != null) card.dataset.years = r.ty;
+          const scoreEl = card.querySelector('.score-val');
+          if (scoreEl) scoreEl.textContent = Math.round(r.score * 100);
+          const yearsEl = card.querySelector('.cand-years');
+          if (yearsEl && (r.ry != null || r.ty != null)) {
+            yearsEl.textContent = r.ry != null && r.ty != null
+              ? `${r.ry.toFixed(1)} / ${r.ty.toFixed(1)} yrs relevant`
+              : `${(r.ty ?? r.ry).toFixed(1)} yrs exp`;
+          }
         });
       }
     } catch(_) {}

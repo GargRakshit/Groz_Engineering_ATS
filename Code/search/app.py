@@ -296,11 +296,16 @@ def _load_results(session, jd_id: Optional[int], ids: Optional[list[int]] = None
         )
         scores_by_resume: dict[int, dict] = {}
         for m in all_matches:
-            scores_by_resume.setdefault(m.resume_id, {})[str(m.jd_id)] = round(m.ats_score, 4)
+            bd = json.loads(m.score_breakdown_json) if m.score_breakdown_json else {}
+            scores_by_resume.setdefault(m.resume_id, {})[str(m.jd_id)] = {
+                "s": round(m.ats_score, 4),
+                "ry": bd.get("relevant_years"),
+                "ty": bd.get("years_experience"),
+            }
 
         for r in results:
             jd_scores = scores_by_resume.get(r["id"], {})
-            best = max(jd_scores.values()) if jd_scores else None
+            best = max((v["s"] for v in jd_scores.values() if isinstance(v, dict)), default=None)
             r["all_scores"] = {**jd_scores, "best": best}
 
     return results
@@ -594,7 +599,13 @@ async def rescore_resumes(req: _RescoreRequest) -> JSONResponse:
                 # the full stage-2 reranker rather than gating on lexical relevance.
                 res = pipeline.score_one(resume_data, jd_text, jd_reqs, force=True)
                 pipeline.persist_match(session, rid, req.jd_id, res)
-                scored.append({"resume_id": rid, "score": round(res["ats_score"], 4)})
+                bd = res["breakdown"]
+                scored.append({
+                    "resume_id": rid,
+                    "score": round(res["ats_score"], 4),
+                    "ry": bd.get("relevant_years"),
+                    "ty": bd.get("years_experience"),
+                })
             except Exception:
                 pass
         session.commit()
@@ -738,14 +749,20 @@ async def score_jd_stream(jd_id: int) -> StreamingResponse:
                     with get_db() as s:
                         pipeline.persist_match(s, rid, jd_id, res)
                         s.commit()
-                    results.append((rid, round(res["ats_score"], 4)))
+                    bd = res["breakdown"]
+                    results.append((
+                        rid,
+                        round(res["ats_score"], 4),
+                        bd.get("relevant_years"),
+                        bd.get("years_experience"),
+                    ))
                 return results
 
             persisted = await asyncio.to_thread(_persist_chunk)
 
-            for rid, score in persisted:
+            for rid, score, ry, ty in persisted:
                 done += 1
-                yield f"data: {json.dumps({'done': done, 'total': total, 'resume_id': rid, 'score': score})}\n\n"
+                yield f"data: {json.dumps({'done': done, 'total': total, 'resume_id': rid, 'score': score, 'ry': ry, 'ty': ty})}\n\n"
 
         yield f"data: {json.dumps({'done': done, 'total': total, 'complete': True})}\n\n"
 
