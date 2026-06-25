@@ -18,6 +18,7 @@ from Code.matching.bm25e import (
     matched_terms,
     relevant_years,
     resume_full_text,
+    score_and_match_batch,
     score_resume as bm25e_score,
 )
 from Code.matching.education import check_certifications, meets_requirement
@@ -73,21 +74,51 @@ def score_one(resume_data, jd_text: str, jd_reqs, *, force: bool = False) -> dic
     return _phrase_result(resume_data, jd_text, jd_reqs)
 
 
+_BATCH = 32  # resumes per CE batch in corpus scoring
+
+
+def build_result(
+    resume_data, jd_text: str, jd_reqs, match_score: float,
+    matched: list, missing: list,
+) -> dict:
+    """Build a full result dict from pre-computed match_score and pills.
+
+    Used by the SSE scoring endpoint so the per-resume overhead (relevant_years,
+    edu/exp/cert checks) runs in the same thread as batch CE scoring.
+    """
+    overall, bd = _factors(resume_data, jd_reqs, jd_text, match_score)
+    bd["scorer"] = "phrase_ce_batch"
+    return {"ats_score": overall, "breakdown": bd, "matched": matched, "missing": missing}
+
+
 def score_jd_against_corpus(session, jd_id: int, jd_text: str, jd_reqs, resume_rows) -> dict:
-    """Score all resumes against one JD (used when adding a new JD).
+    """Score all resumes against one JD using batched CE scoring.
     Persists a Match row per resume and commits."""
-    count = 0
+    valid: list[tuple[int, ResumeData]] = []
     for r in resume_rows:
         if not r.parsed_json:
             continue
         try:
-            rd = ResumeData.model_validate_json(r.parsed_json)
-            persist_match(session, r.id, jd_id, _phrase_result(rd, jd_text, jd_reqs))
-            count += 1
+            valid.append((r.id, ResumeData.model_validate_json(r.parsed_json)))
         except Exception:
-            logging.exception("Scoring failed for resume %s", r.id)
+            logging.exception("Parse failed for resume %s", r.id)
+
+    count = 0
+    for start in range(0, len(valid), _BATCH):
+        chunk = valid[start : start + _BATCH]
+        ids = [rid for rid, _ in chunk]
+        rds = [rd for _, rd in chunk]
+        try:
+            batch = score_and_match_batch(rds, jd_text, jd_reqs)
+        except Exception:
+            logging.exception("Batch scoring failed (chunk %d)", start)
+            continue
+        for rid, rd, (ms, matched, missing) in zip(ids, rds, batch):
+            persist_match(session, rid, jd_id, build_result(rd, jd_text, jd_reqs, ms, matched, missing))
+            count += 1
+
     session.commit()
-    return {"judged": 0, "total": count, "scorer": "phrase_ce"}
+    return {"judged": 0, "total": count, "scorer": "phrase_ce_batch"}
 
 
 def persist_match(session, resume_id: int, jd_id: int, result: dict) -> None:

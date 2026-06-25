@@ -260,6 +260,58 @@ def matched_terms(
     return list(dict.fromkeys(matched)), list(dict.fromkeys(missing))
 
 
+def score_and_match_batch(
+    resumes: list, jd_raw_text: str, jd_reqs=None
+) -> list[tuple[float, list[str], list[str]]]:
+    """Score multiple resumes and compute matched/missing pills in one CE call.
+
+    All (phrase, resume_text) pairs across every resume are sent to the CE in a
+    single batched prediction, which is substantially faster than calling
+    score_resume() + matched_terms() N times (N CE calls → 1 CE call).
+
+    Returns list of (match_score, matched_phrases, missing_phrases), same order
+    as *resumes*.
+    """
+    if not resumes:
+        return []
+    phrases = _all_jd_phrases(jd_reqs, jd_raw_text)
+    if not phrases or not jd_raw_text.strip():
+        return [(0.0, [], []) for _ in resumes]
+
+    full_texts = [resume_full_text(r) for r in resumes]
+    n_phrases = len(phrases)
+    total_w = sum(w for _, w in phrases)
+
+    # One mega-batch: for each resume, pair every phrase with that resume's text
+    all_pairs = [(p, ft) for ft in full_texts for p, _ in phrases]
+    raw_all = _get_ce().predict(all_pairs, batch_size=256, show_progress_bar=False)
+
+    results = []
+    for i, ft in enumerate(full_texts):
+        if not ft.strip():
+            results.append((0.0, [], []))
+            continue
+        cal_scores = []
+        for j, (p, _) in enumerate(phrases):
+            cal = _calibrate(float(raw_all[i * n_phrases + j]))
+            if cal < PHRASE_MATCH_THRESHOLD:
+                cal = max(cal, _term_match_score(p, ft))
+            cal_scores.append(cal)
+
+        match_score = round(
+            sum(s * w for s, (_, w) in zip(cal_scores, phrases)) / total_w, 4
+        )
+        matched = list(dict.fromkeys(
+            p for (p, _), s in zip(phrases, cal_scores) if s >= PHRASE_MATCH_THRESHOLD
+        ))
+        missing = list(dict.fromkeys(
+            p for (p, _), s in zip(phrases, cal_scores) if s < PHRASE_MATCH_THRESHOLD
+        ))
+        results.append((match_score, matched, missing))
+
+    return results
+
+
 # ---------------------------------------------------------------------------
 # Resume text assembly
 # ---------------------------------------------------------------------------

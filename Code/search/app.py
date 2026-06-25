@@ -13,7 +13,7 @@ from typing import Optional
 from dotenv import load_dotenv
 from fastapi import FastAPI, File, Form, Request, UploadFile
 from sqlalchemy import text
-from fastapi.responses import FileResponse, HTMLResponse, JSONResponse, RedirectResponse
+from fastapi.responses import FileResponse, HTMLResponse, JSONResponse, RedirectResponse, StreamingResponse
 from fastapi.staticfiles import StaticFiles
 from fastapi.templating import Jinja2Templates
 from pydantic import BaseModel
@@ -610,6 +610,8 @@ async def add_jd(
     file: UploadFile = File(...),
     name: str = Form(""),
 ) -> JSONResponse:
+    """Create a JD record and extract requirements. Scoring is streamed separately
+    via GET /jd/{jd_id}/score-stream so the client can show a progress bar."""
     suffix = Path(file.filename or "").suffix.lower()
     if suffix not in {".pdf", ".docx", ".txt"}:
         return JSONResponse(
@@ -640,11 +642,115 @@ async def add_jd(
 
     cutoff = datetime.utcnow() - timedelta(days=183)
     with get_db() as session:
-        recent = session.query(Resume).filter(Resume.created_at >= cutoff).all()
-        # Two-stage: lexical shortlist over the whole corpus, judge only the
-        # top-K (falls back to cross-encoder for all when the judge is off).
-        summary = pipeline.score_jd_against_corpus(session, jd_id, jd_text, jd_reqs, recent)
+        resume_count = (
+            session.query(Resume)
+            .filter(Resume.created_at >= cutoff, Resume.parsed_json.isnot(None))
+            .count()
+        )
 
     return JSONResponse(content={
-        "jd_id": jd_id, "name": jd_name, "scored_count": summary["total"],
+        "jd_id": jd_id, "name": jd_name, "resume_count": resume_count,
     })
+
+
+@app.get("/jd/{jd_id}/score-stream")
+async def score_jd_stream(jd_id: int) -> StreamingResponse:
+    """SSE endpoint: scores all recent resumes against jd_id, emitting one
+    progress event per resume so the UI can display a live progress bar.
+
+    Events:
+      {"total": N, "done": 0}                          — initial total
+      {"done": K, "total": N, "resume_id": R, "score": S}  — per-resume
+      {"done": N, "total": N, "complete": true}         — final
+    """
+    import asyncio
+
+    async def generate():
+        # ── 1. Load JD row + resume list ─────────────────────────────────
+        def _load_db():
+            with get_db() as s:
+                jd = s.query(JobDescription).filter_by(id=jd_id).first()
+                if jd is None:
+                    return None, []
+                cutoff = datetime.utcnow() - timedelta(days=183)
+                rows = s.query(Resume).filter(
+                    Resume.created_at >= cutoff,
+                    Resume.parsed_json.isnot(None),
+                ).all()
+                return (jd.file_path, jd.requirements_json), [
+                    (r.id, r.parsed_json) for r in rows
+                ]
+
+        jd_info, rows_data = await asyncio.to_thread(_load_db)
+
+        if jd_info is None:
+            yield f"data: {json.dumps({'error': 'JD not found'})}\n\n"
+            return
+
+        total = len(rows_data)
+        yield f"data: {json.dumps({'total': total, 'done': 0})}\n\n"
+
+        if total == 0:
+            yield f"data: {json.dumps({'total': 0, 'done': 0, 'complete': True})}\n\n"
+            return
+
+        # ── 2. Prep JD text and requirements ─────────────────────────────
+        jd_file_path, jd_req_json = jd_info
+
+        def _prep_jd():
+            raw, _ = extract_document_text_and_links(Path(jd_file_path))
+            text = clean_extracted_text(raw)
+            reqs = JDRequirements.model_validate_json(jd_req_json) if jd_req_json else None
+            return text, reqs
+
+        jd_text, jd_reqs = await asyncio.to_thread(_prep_jd)
+
+        # ── 3. Parse all resume data (no CE yet) ─────────────────────────
+        def _parse_all():
+            parsed = []
+            for rid, pj in rows_data:
+                try:
+                    parsed.append((rid, ResumeData.model_validate_json(pj)))
+                except Exception:
+                    pass
+            return parsed
+
+        valid = await asyncio.to_thread(_parse_all)
+
+        # ── 4. Score in chunks: one CE mega-batch per chunk ───────────────
+        CHUNK = 16
+        done = 0
+
+        for chunk_start in range(0, len(valid), CHUNK):
+            chunk = valid[chunk_start : chunk_start + CHUNK]
+
+            def _score_chunk(ch=chunk, jt=jd_text, jr=jd_reqs):
+                from Code.matching.bm25e import score_and_match_batch
+                rds = [rd for _, rd in ch]
+                return score_and_match_batch(rds, jt, jr)
+
+            batch = await asyncio.to_thread(_score_chunk)
+
+            def _persist_chunk(ch=chunk, bt=batch, jt=jd_text, jr=jd_reqs):
+                results = []
+                for (rid, rd), (ms, matched, missing) in zip(ch, bt):
+                    res = pipeline.build_result(rd, jt, jr, ms, matched, missing)
+                    with get_db() as s:
+                        pipeline.persist_match(s, rid, jd_id, res)
+                        s.commit()
+                    results.append((rid, round(res["ats_score"], 4)))
+                return results
+
+            persisted = await asyncio.to_thread(_persist_chunk)
+
+            for rid, score in persisted:
+                done += 1
+                yield f"data: {json.dumps({'done': done, 'total': total, 'resume_id': rid, 'score': score})}\n\n"
+
+        yield f"data: {json.dumps({'done': done, 'total': total, 'complete': True})}\n\n"
+
+    return StreamingResponse(
+        generate(),
+        media_type="text/event-stream",
+        headers={"Cache-Control": "no-cache", "X-Accel-Buffering": "no"},
+    )

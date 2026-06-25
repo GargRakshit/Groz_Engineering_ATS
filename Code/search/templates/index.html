@@ -664,9 +664,17 @@
         <div id="jd-file-name" style="display:none; margin-top:0.4rem;"></div>
         <input id="jd-file-input" type="file" accept=".pdf,.docx,.txt" style="display:none">
       </div>
-      <div id="jd-progress" class="progress-msg" style="display:none">
-        <span class="spinner"></span>
-        <span>Extracting requirements and scoring recent resumes…</span>
+      <div id="jd-progress" style="display:none; margin-bottom:0.5rem;">
+        <div class="progress-msg" id="jd-progress-phase">
+          <span class="spinner"></span>
+          <span id="jd-progress-label">Extracting requirements…</span>
+        </div>
+        <div id="jd-score-progress" style="display:none; gap:0.5rem; align-items:center; margin-top:0.35rem;">
+          <div class="rescore-bar-wrap" style="max-width:none; flex:1;">
+            <div class="rescore-bar-fill" id="jd-bar-fill"></div>
+          </div>
+          <span class="rescore-progress-text" id="jd-progress-count"></span>
+        </div>
       </div>
       <div class="upload-actions">
         <button type="submit" class="btn" id="jd-process-btn" disabled>Add JD</button>
@@ -1134,6 +1142,12 @@ function updateScores() {
     card.dataset.score = score != null ? score : '';
     const scoreEl = card.querySelector('.score-val');
     if (scoreEl) scoreEl.textContent = score != null ? Math.round(score * 100) : '—';
+    // Bug 2: keep the report link in sync with the selected JD
+    const link = card.querySelector('.cand-name a');
+    if (link) {
+      const rid = card.dataset.resumeId;
+      link.href = `/resume/${rid}${jdId ? '?jd_id=' + jdId : ''}`;
+    }
   });
 
   if (jdId) {
@@ -1393,30 +1407,117 @@ document.getElementById('jd-file-input').addEventListener('change', function() {
 
 document.getElementById('jd-form').addEventListener('submit', async function(e) {
   e.preventDefault();
-  const btn      = document.getElementById('jd-process-btn');
-  const resultEl = document.getElementById('jd-result');
-  const progEl   = document.getElementById('jd-progress');
-  btn.disabled   = true;
+  const btn         = document.getElementById('jd-process-btn');
+  const resultEl    = document.getElementById('jd-result');
+  const progEl      = document.getElementById('jd-progress');
+  const phaseEl     = document.getElementById('jd-progress-phase');
+  const labelEl     = document.getElementById('jd-progress-label');
+  const scoreProgEl = document.getElementById('jd-score-progress');
+  const barFill     = document.getElementById('jd-bar-fill');
+  const countEl     = document.getElementById('jd-progress-count');
+
+  btn.disabled = true;
   resultEl.innerHTML = '';
+  labelEl.textContent = 'Extracting requirements…';
+  scoreProgEl.style.display = 'none';
+  barFill.style.width = '0%';
   progEl.style.display = '';
 
   const fd = new FormData();
   fd.append('file', document.getElementById('jd-file-input').files[0]);
   fd.append('name', document.getElementById('jd-name').value.trim());
 
+  // ── Step 1: create JD + extract requirements ────────────────────────────
+  let jdData;
   try {
     const resp = await fetch('/jd', { method: 'POST', body: fd });
-    const data = await resp.json();
-    if (data.error) {
-      resultEl.innerHTML = `<div class="upload-result err">✗ ${escHtml(data.error)}</div>`;
-    } else {
-      const n = data.scored_count;
-      resultEl.innerHTML = `<div class="upload-result ok">✓ <strong>${escHtml(data.name)}</strong> added · ${n} resume${n!==1?'s':''} scored</div>`;
-      addJdToDropdowns(data.jd_id, data.name);
-    }
+    jdData = await resp.json();
   } catch(err) {
     resultEl.innerHTML = `<div class="upload-result err">✗ Failed: ${escHtml(String(err))}</div>`;
+    progEl.style.display = 'none';
+    btn.disabled = false;
+    return;
   }
+
+  if (jdData.error) {
+    resultEl.innerHTML = `<div class="upload-result err">✗ ${escHtml(jdData.error)}</div>`;
+    progEl.style.display = 'none';
+    btn.disabled = false;
+    return;
+  }
+
+  addJdToDropdowns(jdData.jd_id, jdData.name);
+
+  const total = jdData.resume_count || 0;
+  if (total === 0) {
+    resultEl.innerHTML = `<div class="upload-result ok">✓ <strong>${escHtml(jdData.name)}</strong> added · no resumes to score</div>`;
+    progEl.style.display = 'none';
+    btn.disabled = false;
+    return;
+  }
+
+  // ── Step 2: stream scoring progress via SSE ─────────────────────────────
+  labelEl.textContent = `Scoring resumes…`;
+  scoreProgEl.style.display = 'flex';
+  countEl.textContent = `0 / ${total}`;
+
+  await new Promise(resolve => {
+    const source = new EventSource(`/jd/${jdData.jd_id}/score-stream`);
+    let done = 0;
+
+    source.onmessage = ev => {
+      let d;
+      try { d = JSON.parse(ev.data); } catch(_) { return; }
+
+      if (d.error) {
+        source.close();
+        resultEl.innerHTML = `<div class="upload-result err">✗ Scoring error: ${escHtml(d.error)}</div>`;
+        resolve();
+        return;
+      }
+
+      // Update card's data-scores in real-time (fixes Bug 1: scores no longer show "—")
+      if (d.resume_id != null && d.score != null) {
+        const card = document.querySelector(`.cand-card[data-resume-id="${d.resume_id}"]`);
+        if (card) {
+          let sc = {};
+          try { sc = JSON.parse(card.dataset.scores || '{}'); } catch(_) {}
+          sc[String(jdData.jd_id)] = d.score;
+          card.dataset.scores = JSON.stringify(sc);
+        }
+      }
+
+      if (d.done != null) {
+        done = d.done;
+        const t = d.total || total;
+        barFill.style.width = `${Math.round(done / t * 100)}%`;
+        countEl.textContent = `${done} / ${t}`;
+      }
+
+      if (d.complete) {
+        source.close();
+        const n = done;
+        resultEl.innerHTML = `<div class="upload-result ok">✓ <strong>${escHtml(jdData.name)}</strong> added · ${n} resume${n!==1?'s':''} scored</div>`;
+        // Auto-select new JD and show scores
+        const sel = document.getElementById('jd-filter');
+        if (sel) { sel.value = String(jdData.jd_id); updateScores(); }
+        resolve();
+      }
+    };
+
+    source.onerror = () => {
+      source.close();
+      if (!resultEl.innerHTML) {
+        const n = done;
+        resultEl.innerHTML = `<div class="upload-result ok">✓ <strong>${escHtml(jdData.name)}</strong> added · ${n} resume${n!==1?'s':''} scored</div>`;
+        if (n > 0) {
+          const sel = document.getElementById('jd-filter');
+          if (sel) { sel.value = String(jdData.jd_id); updateScores(); }
+        }
+      }
+      resolve();
+    };
+  });
 
   progEl.style.display = 'none';
   btn.disabled = false;
