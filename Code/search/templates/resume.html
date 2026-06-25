@@ -49,8 +49,14 @@
     {% endif %}
     {% if bd.get('years_experience') is not none %}
     <div class="score-item">
-      <label>Years Exp</label>
+      <label>Total Yrs Exp</label>
       <span class="val">{{ "%.1f"|format(bd.get('years_experience')) }}</span>
+    </div>
+    {% endif %}
+    {% if bd.get('relevant_years') is not none %}
+    <div class="score-item">
+      <label>Relevant Yrs</label>
+      <span class="val">{{ "%.1f"|format(bd.get('relevant_years')) }}</span>
     </div>
     {% endif %}
     {% if bd.get('meets_experience') is not none %}
@@ -147,9 +153,7 @@
     </div>
     {% endif %}
     {% if desc %}
-    <ul class="exp-desc">
-      {% for item in desc %}{% if item %}<li>{{ item }}</li>{% endif %}{% endfor %}
-    </ul>
+    <p class="exp-desc-text">{{ desc }}</p>
     {% endif %}
   </div>
   {% endfor %}
@@ -206,7 +210,7 @@
   {% set name = proj.get('name') %}
   {% set link = proj.get('link') %}
   {% set techs = proj.get('technologies_used', []) %}
-  {% set pdesc = proj.get('description', []) %}
+  {% set pdesc = proj.get('description') %}
   <div class="exp-entry">
     {% if name %}
     <div class="exp-role">
@@ -220,9 +224,7 @@
     </div>
     {% endif %}
     {% if pdesc %}
-    <ul class="exp-desc">
-      {% for item in pdesc %}{% if item %}<li>{{ item }}</li>{% endif %}{% endfor %}
-    </ul>
+    <p class="exp-desc-text">{{ pdesc }}</p>
     {% endif %}
   </div>
   {% endfor %}

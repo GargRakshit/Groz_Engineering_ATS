@@ -384,11 +384,23 @@ class JDRequirements(BaseModel):
             "Same phrase format as required_qualifications."
         )
     )
+    key_responsibilities: List[str] = Field(
+        default_factory=list,
+        description=(
+            "6–10 short activity phrases (7–15 words each) from the job duties / responsibilities "
+            "section describing what the candidate will DO in the role. Role-specific only — "
+            "exclude generic phrases like 'work in a team' or 'communicate with stakeholders'. "
+            "Examples: 'manage die casting process parameters and shot weights', "
+            "'oversee shot blast and fettling operations', "
+            "'coordinate preventive maintenance schedules with maintenance team'."
+        )
+    )
 
     @field_validator(
         "required_skills", "preferred_skills",
         "required_certifications", "preferred_certifications",
         "required_qualifications", "preferred_qualifications",
+        "key_responsibilities",
         mode="before"
     )
     @classmethod

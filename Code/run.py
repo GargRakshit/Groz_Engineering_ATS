@@ -25,13 +25,10 @@ load_dotenv()
 
 from Code.db.repository import save_jd, save_resume
 from Code.db.session import get_db, init_db
-from Code.matching.bm25e import matched_terms, score_resume as bm25e_score
-from Code.matching.education import check_certifications, meets_requirement
-from Code.matching.experience import meets_min_experience, total_years
+from Code.matching import pipeline
 from Code.parser.extract import clean_extracted_text, extract_document_text_and_links
 from Code.parser.prompts import build_resume_extraction_prompt
 from Code.parser.providers import get_provider, load_or_extract_jd
-from Code.scoring import build_score_breakdown, compute_ats_score
 
 
 ARCHIVE_DIR    = ROOT / "Archive"
@@ -83,30 +80,11 @@ def process_resume(
     prompt = build_resume_extraction_prompt(text, links)
     resume_data = provider.extract_resume(prompt)
 
-    # 3. Scoring
-    match_score = bm25e_score(resume_data, jd_text)
-    yrs = total_years(resume_data.experience)
-    overall = compute_ats_score(match_score, yrs)
-
-    exp_ok, _ = meets_min_experience(resume_data.experience, jd_reqs.min_years_experience)
-    edu_ok, _ = meets_requirement(resume_data.education, jd_reqs.required_education_level or "")
-    _, _, missing_certs = check_certifications(
-        resume_data.certifications, jd_reqs.required_certifications or []
-    )
-    cert_ok = not missing_certs
-
-    score_bd = build_score_breakdown(
-        match_score=match_score,
-        overall=overall,
-        years_experience=yrs,
-        meets_experience=exp_ok,
-        education_met=edu_ok,
-        certifications_met=cert_ok,
-    )
-
-    # 4. Matched / missing terms
-    resume_text_for_terms = " ".join(filter(None, resume_data.skills + resume_data.qualifications))
-    m_terms, miss_terms = matched_terms(resume_text_for_terms, jd_text)
+    # 3. Scoring (two-stage pipeline: judge if enabled, else cross-encoder)
+    res = pipeline.score_one(resume_data, jd_text, jd_reqs)
+    score_bd = res["breakdown"]
+    overall = score_bd["overall"]
+    m_terms, miss_terms = res["matched"], res["missing"]
 
     # 5. Archive path
     archive_dir.mkdir(parents=True, exist_ok=True)

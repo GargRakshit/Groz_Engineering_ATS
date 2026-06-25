@@ -6,7 +6,7 @@ import pytest
 from sqlalchemy import create_engine, inspect, text
 from sqlalchemy.orm import sessionmaker
 
-from Code.db.models import Base, Candidate, Education, Experience, Match, Resume, Skill
+from Code.db.models import Base, Candidate, Match, Resume
 from Code.db.fts import init_fts, fts_search
 from Code.db.repository import find_jd_by_path, save_jd, save_resume, search_resumes
 from Code.parser.schemas import (
@@ -75,8 +75,7 @@ def make_resume_data(
 def test_init_db_creates_tables(engine):
     inspector = inspect(engine)
     tables = set(inspector.get_table_names())
-    expected = {"resume", "candidate", "skill", "resume_skill",
-                "experience", "education", "match", "job_description"}
+    expected = {"resume", "candidate", "match", "job_description", "user"}
     assert expected.issubset(tables)
 
 
@@ -90,9 +89,6 @@ def test_save_resume_inserts(session):
 
     assert session.query(Resume).count() == 1
     assert session.query(Candidate).count() == 1
-    assert session.query(Experience).count() == 1
-    assert session.query(Education).count() == 1
-    assert session.query(Skill).count() == 2   # Python, SQL
 
     assert r.source_file == "resume_test.pdf"
     assert r.fts_name == "Test User"
@@ -113,8 +109,6 @@ def test_save_resume_upsert(session):
 
     assert session.query(Resume).count() == 1
     assert r1.id == r2.id
-    # Skills should now reflect the new list
-    assert session.query(Skill).count() >= 3
 
 
 # ---------------------------------------------------------------------------

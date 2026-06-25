@@ -17,6 +17,14 @@ sentence-transformers>=3.0
 rapidfuzz>=3.0
 numpy>=1.24
 
+# Local LLM judge (optional stage-2 reranker; enable with JUDGE_ENABLED=true).
+# Prebuilt wheels target AVX-512; on AVX2-only CPUs (e.g. Raptor Lake mobile,
+# which has AVX-512 disabled) install a CPU-matched build instead, e.g.:
+#   pip install llama-cpp-python --extra-index-url \
+#     https://abetlen.github.io/llama-cpp-python/whl/cpu
+# or build from source against a local toolchain. See DocWork/DOCUMENTATION.docx.
+llama-cpp-python>=0.3
+
 # Database
 sqlalchemy>=2.0
 pymysql>=1.0

@@ -797,7 +797,7 @@
     <option value="name-asc">Name A→Z</option>
     <option value="name-desc">Name Z→A</option>
     <option value="exp">Experience ↓</option>
-    <option value="score" id="sort-score-opt" disabled>Score ↓</option>
+    <option value="score" id="sort-score-opt"{% if current_jd_id %} selected{% else %} disabled{% endif %}>Score ↓</option>
   </select>
   <button class="btn-clear-filters" id="btn-clear-filters" onclick="clearFilters()" style="display:none" title="Clear all filters">
     <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round">
@@ -843,13 +843,15 @@
   {% set bd    = r.score_breakdown or {} %}
   {% set score = r.ats_score %}
   {% set years = bd.get('years_experience') %}
+  {% set rel_years = bd.get('relevant_years') %}
+  {% set filter_years = rel_years if rel_years is not none else years %}
   {% set colors = r.candidate_name|avatar_color %}
 
   <div class="cand-card"
        data-resume-id="{{ r.id }}"
        data-name="{{ (r.candidate_name or '')|lower }}"
        data-skills="{{ (r.skills_list|join(' '))|lower }}"
-       data-years="{{ years if years is not none else '' }}"
+       data-years="{{ filter_years if filter_years is not none else '' }}"
        data-score="{{ score if score is not none else '' }}"
        data-scores='{{ r.get("all_scores", {})|tojson }}'
        data-status="{{ r.status or '' }}">
@@ -871,7 +873,7 @@
       <div class="cand-meta">
         {% if r.email %}<span>{{ r.email }}</span>{% endif %}
         {% if r.location %}{% if r.email %}<span class="meta-sep">·</span>{% endif %}<span>{{ r.location }}</span>{% endif %}
-        {% if years is not none %}{% if r.email or r.location %}<span class="meta-sep">·</span>{% endif %}<span>{{ "%.1f"|format(years) }} yrs exp</span>{% endif %}
+        {% if years is not none %}{% if r.email or r.location %}<span class="meta-sep">·</span>{% endif %}<span>{% if rel_years is not none %}{{ "%.1f"|format(rel_years) }} / {{ "%.1f"|format(years) }} yrs relevant{% else %}{{ "%.1f"|format(years) }} yrs exp{% endif %}</span>{% endif %}
       </div>
       {% if r.skills_list %}
       <div class="cand-skills">{{ r.skills_list|join(', ') }}{% if r.skills_list|length == 6 %}…{% endif %}</div>
@@ -947,6 +949,8 @@ function buildCard(r) {
   const [bg, fg] = _ac(name);
   const bd   = r.score_breakdown || {};
   const yrs  = bd.years_experience;
+  const relYrs = bd.relevant_years;
+  const filterYrs = relYrs != null ? relYrs : yrs;
   const jdId = document.getElementById('jd-filter').value;
   const all  = r.all_scores || {};
   const score = jdId && all[jdId] != null ? all[jdId] : (r.ats_score != null ? r.ats_score : null);
@@ -954,7 +958,11 @@ function buildCard(r) {
   const meta = [];
   if (r.email)    meta.push(`<span>${escHtml(r.email)}</span>`);
   if (r.location) meta.push(`<span>${escHtml(r.location)}</span>`);
-  if (yrs != null) meta.push(`<span>${yrs.toFixed(1)} yrs exp</span>`);
+  if (yrs != null) {
+    meta.push(relYrs != null
+      ? `<span>${relYrs.toFixed(1)} / ${yrs.toFixed(1)} yrs relevant</span>`
+      : `<span>${yrs.toFixed(1)} yrs exp</span>`);
+  }
   const metaHtml = meta.map((s,i)=>(i>0?'<span class="meta-sep">·</span>':'')+s).join('');
 
   const skills = r.skills_list || [];
@@ -974,7 +982,7 @@ function buildCard(r) {
      data-resume-id="${r.id}"
      data-name="${escHtml(name.toLowerCase())}"
      data-skills="${escHtml(skills.join(' ').toLowerCase())}"
-     data-years="${yrs!=null?yrs:''}"
+     data-years="${filterYrs!=null?filterYrs:''}"
      data-score="${score!=null?score:''}"
      data-scores='${JSON.stringify(all)}'
      data-status="${escHtml(st)}">
@@ -1131,6 +1139,9 @@ function updateScores() {
   if (jdId) {
     listArea.classList.remove('no-score');
     scoreOpt.disabled = false;
+    // Selecting a JD means "rank candidates by fit" — switch to score sort
+    // unless the user has deliberately chosen a non-default sort.
+    if (sortSel.value === 'name-asc') sortSel.value = 'score';
   } else {
     listArea.classList.add('no-score');
     scoreOpt.disabled = true;
@@ -1226,9 +1237,17 @@ document.getElementById('upload-form').addEventListener('submit', async function
 
     try {
       const resp = await fetch('/upload', { method: 'POST', body: fd });
+      if (!resp.ok) {
+        const msg = resp.status === 401
+          ? 'Session expired — please reload the page and sign in again'
+          : `Server error ${resp.status}`;
+        allResults.push({ filename: files[i].name, status: 'error', error: msg });
+        continue;
+      }
       const data = await resp.json();
-      allResults.push(...data.results);
-      data.results.forEach(r => { if (r.status === 'added' && r.resume_id) newIds.push(r.resume_id); });
+      const fileResults = Array.isArray(data.results) ? data.results : [];
+      allResults.push(...fileResults);
+      fileResults.forEach(r => { if (r.status === 'added' && r.resume_id) newIds.push(r.resume_id); });
     } catch(err) {
       allResults.push({ filename: files[i].name, status: 'error', error: String(err) });
     }

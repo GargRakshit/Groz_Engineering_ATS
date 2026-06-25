@@ -31,8 +31,8 @@ def test_zero_score():
 
 def test_known_good():
     # match=0.6, years=5 → exp_score=0.5
-    # overall = 0.70*0.6 + 0.30*0.5 = 0.42 + 0.15 = 0.57
-    assert compute_ats_score(0.6, 5.0) == pytest.approx(0.57, abs=1e-4)
+    # overall = 0.60*0.6 + 0.40*0.5 = 0.36 + 0.20 = 0.56
+    assert compute_ats_score(0.6, 5.0) == pytest.approx(W_MATCH * 0.6 + W_EXP * 0.5, abs=1e-4)
 
 
 def test_exp_score_capped_at_one():
@@ -67,24 +67,26 @@ def test_breakdown_keys():
         match_score=0.6,
         overall=0.57,
         years_experience=5.0,
+        relevant_years=3.5,
         meets_experience=True,
         education_met=True,
         certifications_met=False,
     )
     assert set(bd.keys()) == {
-        "overall", "match_score", "years_experience",
+        "overall", "match_score", "years_experience", "relevant_years",
         "meets_experience", "education_met", "certifications_met",
     }
 
 
 def test_breakdown_overall_matches_compute():
     match = 0.6
-    yrs = 5.0
-    overall = compute_ats_score(match, yrs)
+    rel_yrs = 3.5
+    overall = compute_ats_score(match, rel_yrs)
     bd = build_score_breakdown(
         match_score=match,
         overall=overall,
-        years_experience=yrs,
+        years_experience=5.0,
+        relevant_years=rel_yrs,
         meets_experience=True,
         education_met=False,
         certifications_met=True,
@@ -92,7 +94,8 @@ def test_breakdown_overall_matches_compute():
     assert bd["overall"] == pytest.approx(overall, abs=1e-4)
     assert bd["education_met"] is False
     assert bd["certifications_met"] is True
-    assert bd["years_experience"] == pytest.approx(yrs, abs=0.05)
+    assert bd["years_experience"] == pytest.approx(5.0, abs=0.05)
+    assert bd["relevant_years"] == pytest.approx(rel_yrs, abs=0.05)
 
 
 def test_breakdown_rounding():
@@ -100,16 +103,18 @@ def test_breakdown_rounding():
         match_score=0.12345,
         overall=0.0864,
         years_experience=1.123,
+        relevant_years=0.678,
         meets_experience=False,
         education_met=False,
         certifications_met=False,
     )
     assert bd["match_score"] == round(0.12345, 4)
     assert bd["years_experience"] == round(1.123, 1)
+    assert bd["relevant_years"] == round(0.678, 1)
 
 
 def test_breakdown_boolean_fields():
-    bd = build_score_breakdown(0.5, 0.5, 3.0, True, False, True)
+    bd = build_score_breakdown(0.5, 0.5, 3.0, 2.0, True, False, True)
     assert bd["meets_experience"] is True
     assert bd["education_met"] is False
     assert bd["certifications_met"] is True

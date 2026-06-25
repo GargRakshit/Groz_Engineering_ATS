@@ -9,15 +9,39 @@ from sqlalchemy.orm import Session
 from Code.db.fts import fts_search
 from Code.db.models import (
     Candidate,
-    Education,
-    Experience,
     JobDescription,
     Match,
     Resume,
-    Skill,
-    resume_skill,
 )
 from Code.parser.schemas import JDRequirements, ResumeData
+
+
+def _lex_tokens_json(resume_data: ResumeData) -> Optional[str]:
+    """Precompute the stage-1 lexical features (BM25 token counts + token forms)
+    for two-stage retrieval. Defensive: never block a save if tokenization fails."""
+    try:
+        from Code.matching.retrieve import resume_lex_features
+        return json.dumps(resume_lex_features(resume_data))
+    except Exception:
+        return None
+
+
+def backfill_lex_features(session: Session) -> int:
+    """Populate Resume.lex_tokens_json for rows ingested before the column
+    existed. Returns the number of rows updated."""
+    rows = session.query(Resume).filter(Resume.lex_tokens_json.is_(None)).all()
+    updated = 0
+    for r in rows:
+        if not r.parsed_json:
+            continue
+        try:
+            rd = ResumeData.model_validate_json(r.parsed_json)
+            r.lex_tokens_json = _lex_tokens_json(rd)
+            updated += 1
+        except Exception:
+            continue
+    session.commit()
+    return updated
 
 
 # ---------------------------------------------------------------------------
@@ -100,6 +124,7 @@ def save_resume(
     resume.fts_skills = fts_skills
     resume.fts_summary = fts_summary
     resume.parsed_at = resume_data.parsed_at
+    resume.lex_tokens_json = _lex_tokens_json(resume_data)
     if archive_file is not None:
         resume.archive_file = archive_file
 
@@ -120,43 +145,6 @@ def save_resume(
         github=c.github if c else None,
         portfolio=c.portfolio if c else None,
     ))
-
-    # --- experience (delete + re-insert) ---
-    session.query(Experience).filter_by(resume_id=resume.id).delete()
-    for exp in (resume_data.experience or []):
-        session.add(Experience(
-            resume_id=resume.id,
-            company=exp.company,
-            role=exp.role,
-            start_date=exp.start_date,
-            end_date=exp.end_date,
-            is_current=exp.is_current,
-            description=exp.description,
-        ))
-
-    # --- education (delete + re-insert) ---
-    session.query(Education).filter_by(resume_id=resume.id).delete()
-    for edu in (resume_data.education or []):
-        session.add(Education(
-            resume_id=resume.id,
-            degree=edu.degree,
-            field_of_study=edu.field_of_study,
-            institution=edu.institution,
-            start_date=edu.start_date,
-            end_date=edu.end_date,
-            grade=edu.grade,
-        ))
-
-    # --- skills (rebuild association table) ---
-    session.execute(resume_skill.delete().where(resume_skill.c.resume_id == resume.id))
-    for skill_name in (resume_data.skills or []):
-        norm = skill_name.lower()
-        skill = session.query(Skill).filter_by(name=norm).first()
-        if skill is None:
-            skill = Skill(name=norm)
-            session.add(skill)
-            session.flush()
-        session.execute(resume_skill.insert().values(resume_id=resume.id, skill_id=skill.id))
 
     # --- match (upsert if score provided) ---
     if score_breakdown is not None and jd_id is not None:

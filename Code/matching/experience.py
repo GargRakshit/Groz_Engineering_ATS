@@ -47,9 +47,9 @@ def total_years(experiences) -> float:
     return round(total_months / 12, 1)
 
 
-def meets_min_experience(experiences, min_years: Optional[float]) -> tuple[bool, str]:
+def meets_min_experience(years: float, min_years: Optional[float]) -> tuple[bool, str]:
+    """Check years (callers pass *relevant* years) against the JD minimum."""
     if min_years is None:
         return True, "No minimum specified"
-    years = total_years(experiences)
-    msg = f"{years} years of experience (required: {min_years})"
+    msg = f"{years} years of relevant experience (required: {min_years})"
     return years >= min_years, msg

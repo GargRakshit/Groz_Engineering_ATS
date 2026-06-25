@@ -151,7 +151,7 @@ def build_jd_extraction_prompt(text: str) -> str:
     return f"""
 You are a job description parsing engine. Extract structured hiring requirements from the job description below.
 
-Output a single JSON object with exactly these top-level keys: 'required_skills', 'preferred_skills', 'min_years_experience', 'required_education_level', 'required_certifications', 'preferred_certifications', 'required_qualifications', 'preferred_qualifications'. No markdown, no commentary, no wrapping keys.
+Output a single JSON object with exactly these top-level keys: 'required_skills', 'preferred_skills', 'min_years_experience', 'required_education_level', 'required_certifications', 'preferred_certifications', 'required_qualifications', 'preferred_qualifications', 'key_responsibilities'. No markdown, no commentary, no wrapping keys.
 
 # Rules
 1. Extract only what is stated. Do not infer, invent, or embellish.
@@ -162,6 +162,7 @@ Output a single JSON object with exactly these top-level keys: 'required_skills'
 6. skills: named tools, technologies, and methodologies only (Python, AWS, Agile, SQL, Excel). Do NOT include vague experience statements — those are not extractable as skills.
 7. certifications: named credentials only (PMP, AWS Solutions Architect, CPA, Six Sigma Green Belt). Do NOT place certifications in skills.
 8. qualifications: experience-based requirements that are NOT named skills or certifications. Concise 3–8 word phrases only. Examples: 'cross-functional team leadership', 'regulated industry experience', 'executive stakeholder management', 'P&L ownership'. Apply required/preferred split the same as other fields.
+9. key_responsibilities: extract 6–10 short activity phrases (7–15 words each) from the job duties / responsibilities section describing what the candidate will DO in the role. Each phrase must be role-specific — skip generic statements like "work in a team", "communicate with stakeholders", "maintain records". Good examples: "manage die casting process parameters and shot weights", "oversee shot blast fettling and trimming operations", "coordinate preventive maintenance schedules with the maintenance team", "analyse casting defects and implement corrective actions", "ensure compliance with quality standards such as IATF 16949 or ISO 9001". Extract from the duties/responsibilities section only; do NOT repeat items already in required_skills or qualifications.
 
 # Job description text:
 \"\"\"

@@ -30,6 +30,11 @@ Archive/
 JDCache/
 # SQLite fallback DB (production uses MySQL)
 *.db
+# Output directory (generated files)
+Output/
+
+# ── Local models (large binary files — download separately) ───────────────
+models/
 
 # ── OS / editor ───────────────────────────────────────────────────────────
 .DS_Store

@@ -404,13 +404,21 @@ def load_or_extract_jd(
         try:
             cached = json.loads(cache_path.read_text(encoding="utf-8"))
             if cached.get("hash") == file_hash:
-                print(f"[JD cache] hit: {path.name}", flush=True)
-                return JDRequirements.model_validate(cached["requirements"])
-            raise RuntimeError(
-                f"\n[JD cache] conflict: '{path.name}' has different content from the cached version.\n"
-                f"  → Rename the new file to a different name and re-run, or\n"
-                f"  → Delete '{cache_path}' to replace the cached JD."
-            )
+                reqs_dict = cached.get("requirements", {})
+                if "key_responsibilities" not in reqs_dict:
+                    print(
+                        f"[JD cache] schema upgrade: '{path.name}' lacks key_responsibilities — re-extracting",
+                        flush=True,
+                    )
+                else:
+                    print(f"[JD cache] hit: {path.name}", flush=True)
+                    return JDRequirements.model_validate(reqs_dict)
+            else:
+                raise RuntimeError(
+                    f"\n[JD cache] conflict: '{path.name}' has different content from the cached version.\n"
+                    f"  → Rename the new file to a different name and re-run, or\n"
+                    f"  → Delete '{cache_path}' to replace the cached JD."
+                )
         except RuntimeError:
             raise
         except Exception:

@@ -7,7 +7,7 @@ from contextlib import contextmanager
 from pathlib import Path
 
 from dotenv import load_dotenv
-from sqlalchemy import create_engine
+from sqlalchemy import create_engine, inspect, text
 from sqlalchemy.orm import sessionmaker, Session
 
 from Code.db.models import Base, User
@@ -44,9 +44,25 @@ engine = create_engine(
 SessionLocal = sessionmaker(autocommit=False, autoflush=False, bind=engine)
 
 
+def _ensure_columns() -> None:
+    """Add columns introduced after the table was first created (idempotent).
+
+    Base.metadata.create_all() creates new tables but never alters existing
+    ones, so new columns on a pre-existing table must be added explicitly.
+    """
+    inspector = inspect(engine)
+    if "resume" not in inspector.get_table_names():
+        return
+    existing = {c["name"] for c in inspector.get_columns("resume")}
+    if "lex_tokens_json" not in existing:
+        with engine.begin() as conn:
+            conn.execute(text("ALTER TABLE resume ADD COLUMN lex_tokens_json TEXT"))
+
+
 def init_db() -> None:
     """Create all tables (idempotent), set up FTS index, and seed default user."""
     Base.metadata.create_all(engine)
+    _ensure_columns()
     _fts.init_fts(engine)
     with SessionLocal() as session:
         if not session.query(User).first():

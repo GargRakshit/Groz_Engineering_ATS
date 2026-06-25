@@ -5,13 +5,11 @@ from datetime import datetime
 from typing import Optional
 
 from sqlalchemy import (
-    Column,
     DateTime,
     Float,
     ForeignKey,
     Integer,
     String,
-    Table,
     Text,
     UniqueConstraint,
     Boolean,
@@ -21,15 +19,6 @@ from sqlalchemy.orm import DeclarativeBase, Mapped, mapped_column, relationship
 
 class Base(DeclarativeBase):
     pass
-
-
-# Many-to-many: Resume ↔ Skill
-resume_skill = Table(
-    "resume_skill",
-    Base.metadata,
-    Column("resume_id", Integer, ForeignKey("resume.id", ondelete="CASCADE"), primary_key=True),
-    Column("skill_id", Integer, ForeignKey("skill.id", ondelete="CASCADE"), primary_key=True),
-)
 
 
 class JobDescription(Base):
@@ -57,6 +46,10 @@ class Resume(Base):
     fts_name: Mapped[Optional[str]] = mapped_column(Text, nullable=True)
     fts_skills: Mapped[Optional[str]] = mapped_column(Text, nullable=True)
     fts_summary: Mapped[Optional[str]] = mapped_column(Text, nullable=True)
+    # Precomputed lexical features for stage-1 retrieval (BM25 token counts +
+    # token forms). Populated at ingest so a new JD can shortlist the whole
+    # corpus without re-tokenizing every resume. See Code/matching/retrieve.py.
+    lex_tokens_json: Mapped[Optional[str]] = mapped_column(Text, nullable=True)
     parsed_at: Mapped[Optional[datetime]] = mapped_column(DateTime, nullable=True)
     status: Mapped[Optional[str]] = mapped_column(String(20), nullable=True)
     created_at: Mapped[datetime] = mapped_column(DateTime, default=datetime.utcnow, nullable=False)
@@ -64,13 +57,6 @@ class Resume(Base):
     candidate: Mapped[Optional[Candidate]] = relationship(
         "Candidate", back_populates="resume", cascade="all, delete-orphan", uselist=False
     )
-    experiences: Mapped[list[Experience]] = relationship(
-        "Experience", back_populates="resume", cascade="all, delete-orphan"
-    )
-    educations: Mapped[list[Education]] = relationship(
-        "Education", back_populates="resume", cascade="all, delete-orphan"
-    )
-    skills: Mapped[list[Skill]] = relationship("Skill", secondary=resume_skill, back_populates="resumes")
     matches: Mapped[list[Match]] = relationship("Match", back_populates="resume", cascade="all, delete-orphan")
 
 
@@ -88,45 +74,6 @@ class Candidate(Base):
     portfolio: Mapped[Optional[str]] = mapped_column(String(512), nullable=True)
 
     resume: Mapped[Resume] = relationship("Resume", back_populates="candidate")
-
-
-class Skill(Base):
-    __tablename__ = "skill"
-
-    id: Mapped[int] = mapped_column(Integer, primary_key=True)
-    name: Mapped[str] = mapped_column(String(255), unique=True, nullable=False)
-
-    resumes: Mapped[list[Resume]] = relationship("Resume", secondary=resume_skill, back_populates="skills")
-
-
-class Experience(Base):
-    __tablename__ = "experience"
-
-    id: Mapped[int] = mapped_column(Integer, primary_key=True)
-    resume_id: Mapped[int] = mapped_column(Integer, ForeignKey("resume.id", ondelete="CASCADE"), nullable=False)
-    company: Mapped[Optional[str]] = mapped_column(String(255), nullable=True)
-    role: Mapped[Optional[str]] = mapped_column(String(255), nullable=True)
-    start_date: Mapped[Optional[str]] = mapped_column(String(20), nullable=True)
-    end_date: Mapped[Optional[str]] = mapped_column(String(20), nullable=True)
-    is_current: Mapped[bool] = mapped_column(Boolean, default=False, nullable=False)
-    description: Mapped[Optional[str]] = mapped_column(Text, nullable=True)
-
-    resume: Mapped[Resume] = relationship("Resume", back_populates="experiences")
-
-
-class Education(Base):
-    __tablename__ = "education"
-
-    id: Mapped[int] = mapped_column(Integer, primary_key=True)
-    resume_id: Mapped[int] = mapped_column(Integer, ForeignKey("resume.id", ondelete="CASCADE"), nullable=False)
-    degree: Mapped[Optional[str]] = mapped_column(String(255), nullable=True)
-    field_of_study: Mapped[Optional[str]] = mapped_column(String(255), nullable=True)
-    institution: Mapped[Optional[str]] = mapped_column(String(255), nullable=True)
-    start_date: Mapped[Optional[str]] = mapped_column(String(20), nullable=True)
-    end_date: Mapped[Optional[str]] = mapped_column(String(20), nullable=True)
-    grade: Mapped[Optional[str]] = mapped_column(String(50), nullable=True)
-
-    resume: Mapped[Resume] = relationship("Resume", back_populates="educations")
 
 
 class User(Base):

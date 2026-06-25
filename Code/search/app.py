@@ -2,6 +2,7 @@
 from __future__ import annotations
 
 import json
+import logging
 import os
 import secrets
 import time
@@ -31,15 +32,12 @@ from Code.db.repository import (
 )
 from Code.db.models import User
 from Code.db.session import check_password, get_db, init_db
-from Code.matching.bm25e import matched_terms, score_resume as bm25e_score
+from Code.matching import pipeline
 from Code.matching.duplicate import find_duplicates
-from Code.matching.education import check_certifications, meets_requirement
-from Code.matching.experience import meets_min_experience, total_years
 from Code.parser.extract import clean_extracted_text, extract_document_text_and_links
 from Code.parser.prompts import build_jd_extraction_prompt, build_resume_extraction_prompt
 from Code.parser.providers import get_provider
 from Code.parser.schemas import JDRequirements, ResumeData
-from Code.scoring import build_score_breakdown, compute_ats_score
 
 ROOT = Path(__file__).parent.parent.parent
 ARCHIVE_DIR  = ROOT / "Archive"
@@ -158,8 +156,18 @@ templates.env.filters["avatar_color"] = _avatar_color
 def startup() -> None:
     init_db()
     from Code.matching.bm25e import _get_ce, _get_nlp
+    from Code.matching import llm_judge
     _get_nlp()
-    _get_ce()
+    # Warm the active stage-2 reranker. With the judge enabled, load it instead
+    # of the cross-encoder (which is then only a fallback).
+    if llm_judge.is_available():
+        try:
+            llm_judge._get_llm()
+        except Exception:
+            logging.exception("LLM judge failed to load; falling back to cross-encoder")
+            _get_ce()
+    else:
+        _get_ce()
 
 
 # ---------------------------------------------------------------------------
@@ -431,38 +439,10 @@ async def upload_resumes(
                     jd_text = clean_extracted_text(jd_raw)
                     jd_reqs = JDRequirements.model_validate_json(_jd_req_json) if _jd_req_json else None
 
-                    match_score = bm25e_score(resume_data, jd_text)
-                    yrs = total_years(resume_data.experience)
-                    overall = compute_ats_score(match_score, yrs)
-                    exp_ok, _ = meets_min_experience(
-                        resume_data.experience,
-                        jd_reqs.min_years_experience if jd_reqs else None,
-                    )
-                    edu_ok, _ = meets_requirement(
-                        resume_data.education,
-                        (jd_reqs.required_education_level or "") if jd_reqs else "",
-                    )
-                    _, _, missing_certs = check_certifications(
-                        resume_data.certifications,
-                        (jd_reqs.required_certifications or []) if jd_reqs else [],
-                    )
-                    score_bd = build_score_breakdown(
-                        match_score=match_score, overall=overall, years_experience=yrs,
-                        meets_experience=exp_ok, education_met=edu_ok,
-                        certifications_met=not missing_certs,
-                    )
-                    terms = " ".join(filter(None, resume_data.skills + resume_data.qualifications))
-                    matched_sk, missing_sk = matched_terms(terms, jd_text)
+                    res = pipeline.score_one(resume_data, jd_text, jd_reqs)
 
                     with get_db() as session:
-                        m = session.query(Match).filter_by(resume_id=saved.id, jd_id=_jd_id).first()
-                        if m is None:
-                            m = Match(resume_id=saved.id, jd_id=_jd_id)
-                            session.add(m)
-                        m.ats_score = overall
-                        m.score_breakdown_json = json.dumps(score_bd)
-                        m.matched_skills_json = json.dumps(matched_sk)
-                        m.missing_skills_json = json.dumps(missing_sk)
+                        pipeline.persist_match(session, saved.id, _jd_id, res)
                         session.commit()
                 except Exception:
                     pass
@@ -610,38 +590,11 @@ async def rescore_resumes(req: _RescoreRequest) -> JSONResponse:
                 continue
             try:
                 resume_data = ResumeData.model_validate_json(resume.parsed_json)
-                match_score = bm25e_score(resume_data, jd_text)
-                yrs = total_years(resume_data.experience)
-                overall = compute_ats_score(match_score, yrs)
-                exp_ok, _ = meets_min_experience(
-                    resume_data.experience,
-                    jd_reqs.min_years_experience if jd_reqs else None,
-                )
-                edu_ok, _ = meets_requirement(
-                    resume_data.education,
-                    (jd_reqs.required_education_level or "") if jd_reqs else "",
-                )
-                _, _, missing_certs = check_certifications(
-                    resume_data.certifications,
-                    (jd_reqs.required_certifications or []) if jd_reqs else [],
-                )
-                score_bd = build_score_breakdown(
-                    match_score=match_score, overall=overall, years_experience=yrs,
-                    meets_experience=exp_ok, education_met=edu_ok,
-                    certifications_met=not missing_certs,
-                )
-                terms = " ".join(filter(None, resume_data.skills + resume_data.qualifications))
-                matched, missing = matched_terms(terms, jd_text)
-
-                m = session.query(Match).filter_by(resume_id=rid, jd_id=req.jd_id).first()
-                if m is None:
-                    m = Match(resume_id=rid, jd_id=req.jd_id)
-                    session.add(m)
-                m.ats_score = overall
-                m.score_breakdown_json = json.dumps(score_bd)
-                m.matched_skills_json = json.dumps(matched)
-                m.missing_skills_json = json.dumps(missing)
-                scored.append({"resume_id": rid, "score": round(overall, 4)})
+                # force=True: re-score is an explicit user action, so always run
+                # the full stage-2 reranker rather than gating on lexical relevance.
+                res = pipeline.score_one(resume_data, jd_text, jd_reqs, force=True)
+                pipeline.persist_match(session, rid, req.jd_id, res)
+                scored.append({"resume_id": rid, "score": round(res["ats_score"], 4)})
             except Exception:
                 pass
         session.commit()
@@ -686,48 +639,12 @@ async def add_jd(
         jd_id = jd_row.id
 
     cutoff = datetime.utcnow() - timedelta(days=183)
-    scored_count = 0
     with get_db() as session:
         recent = session.query(Resume).filter(Resume.created_at >= cutoff).all()
-        for resume in recent:
-            if not resume.parsed_json:
-                continue
-            try:
-                resume_data = ResumeData.model_validate_json(resume.parsed_json)
-                match_score = bm25e_score(resume_data, jd_text)
-                yrs = total_years(resume_data.experience)
-                overall = compute_ats_score(match_score, yrs)
-                exp_ok, _ = meets_min_experience(
-                    resume_data.experience,
-                    jd_reqs.min_years_experience if jd_reqs else None,
-                )
-                edu_ok, _ = meets_requirement(
-                    resume_data.education,
-                    (jd_reqs.required_education_level or "") if jd_reqs else "",
-                )
-                _, _, missing_certs = check_certifications(
-                    resume_data.certifications,
-                    (jd_reqs.required_certifications or []) if jd_reqs else [],
-                )
-                score_bd = build_score_breakdown(
-                    match_score=match_score, overall=overall, years_experience=yrs,
-                    meets_experience=exp_ok, education_met=edu_ok,
-                    certifications_met=not missing_certs,
-                )
-                terms = " ".join(filter(None, resume_data.skills + resume_data.qualifications))
-                matched, missing = matched_terms(terms, jd_text)
+        # Two-stage: lexical shortlist over the whole corpus, judge only the
+        # top-K (falls back to cross-encoder for all when the judge is off).
+        summary = pipeline.score_jd_against_corpus(session, jd_id, jd_text, jd_reqs, recent)
 
-                m = session.query(Match).filter_by(resume_id=resume.id, jd_id=jd_id).first()
-                if m is None:
-                    m = Match(resume_id=resume.id, jd_id=jd_id)
-                    session.add(m)
-                m.ats_score = overall
-                m.score_breakdown_json = json.dumps(score_bd)
-                m.matched_skills_json = json.dumps(matched)
-                m.missing_skills_json = json.dumps(missing)
-                scored_count += 1
-            except Exception:
-                pass
-        session.commit()
-
-    return JSONResponse(content={"jd_id": jd_id, "name": jd_name, "scored_count": scored_count})
+    return JSONResponse(content={
+        "jd_id": jd_id, "name": jd_name, "scored_count": summary["total"],
+    })
