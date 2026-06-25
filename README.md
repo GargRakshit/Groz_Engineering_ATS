@@ -34,6 +34,10 @@ This project was built in stages, moving progressively away from LLM-heavy proce
 - **Knowledge-graph expansion** — 117k synonym entries (ESCO + O\*NET + ConceptNet) used for experience relevance detection and the term-match fallback.
 - **ATS score formula** — `0.60 × match_score + 0.40 × min(relevant_years / 10, 1.0)`
 - **Web UI** — Candidate cards, filters (name, score, years, status, JD), upload overlay, JD manager, per-resume detail view, dark/light mode
+- **Multi-JD upload** — Upload several JD files at once; each gets its own positions count set during upload
+- **Vacancy tracking** — Each JD tracks open positions; marking a candidate "Selected" auto-decrements the vacancy count; badge shows "Fulfilled" when all seats are filled. Positions are editable at any time from the JD manager.
+- **Per-JD candidate status** — Shortlisted / Interviewed / Selected / Rejected is tracked per JD (not globally), so the same candidate can be at different stages across open roles. Status dropdown is disabled until a JD is selected.
+- **View original files** — "View JD" button on each JD in the manager; "View Resume" button on every candidate's score report page.
 - **Multi-provider LLM** — Groq, Gemini, OpenRouter, Ollama — switch with a single env var
 - **Session auth** — Login required; one active session per user; 15-minute inactivity timeout
 

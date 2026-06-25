@@ -361,6 +361,48 @@ async def serve_file(resume_id: int) -> FileResponse:
     return response
 
 
+@app.get("/jd/{jd_id}/file")
+async def serve_jd_file(jd_id: int) -> FileResponse:
+    with get_db() as session:
+        jd = session.query(JobDescription).filter_by(id=jd_id).first()
+        jd_path = Path(jd.file_path) if jd else None
+
+    if jd_path is None or not jd_path.exists():
+        return HTMLResponse(content="File not available", status_code=404)
+
+    media_types = {
+        ".pdf":  "application/pdf",
+        ".docx": "application/vnd.openxmlformats-officedocument.wordprocessingml.document",
+        ".txt":  "text/plain",
+    }
+    media_type = media_types.get(jd_path.suffix.lower(), "application/octet-stream")
+    response = FileResponse(path=str(jd_path), media_type=media_type)
+    response.headers["Content-Disposition"] = f"inline; filename*=utf-8''{jd_path.name}"
+    return response
+
+
+class _JDUpdate(BaseModel):
+    positions: int
+
+
+@app.patch("/jd/{jd_id}")
+async def update_jd(jd_id: int, body: _JDUpdate) -> JSONResponse:
+    positions = max(1, body.positions)
+    with get_db() as session:
+        jd = session.query(JobDescription).filter_by(id=jd_id).first()
+        if jd is None:
+            return JSONResponse({"error": "not found"}, status_code=404)
+        jd.positions = positions
+        session.commit()
+        from sqlalchemy import func
+        filled = (
+            session.query(func.count(Match.id))
+            .filter(Match.jd_id == jd_id, Match.status == "selected")
+            .scalar()
+        ) or 0
+    return JSONResponse({"positions": positions, "filled": filled})
+
+
 _VALID_STATUSES = {None, "shortlisted", "interviewed", "selected", "rejected"}
 
 

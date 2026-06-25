@@ -603,6 +603,36 @@
       background: #16a34a22; color: #16a34a;
     }
     [data-theme="dark"] .jd-vacancy.fulfilled { color: #4ade80; background: #16a34a33; }
+    .jd-positions-edit {
+      width: 3.4rem; padding: 0.18rem 0.3rem;
+      border: 1px solid var(--border); border-radius: 5px;
+      background: var(--bg); color: var(--text-1);
+      font-size: 0.78rem; text-align: center;
+      flex-shrink: 0;
+    }
+    .jd-positions-edit:focus { outline: 2px solid var(--accent); border-color: transparent; }
+    .btn-view-jd {
+      flex-shrink: 0;
+      font-size: 0.72rem; padding: 0.18rem 0.5rem;
+      border: 1px solid var(--border); border-radius: 5px;
+      background: var(--input-bg); color: var(--text-2);
+      cursor: pointer; white-space: nowrap;
+    }
+    .btn-view-jd:hover { background: var(--border); color: var(--text-1); }
+    .jd-multi-list { display: flex; flex-direction: column; gap: 0.35rem; margin-top: 0.5rem; }
+    .jd-multi-row {
+      display: flex; align-items: center; gap: 0.5rem;
+      font-size: 0.82rem; color: var(--text-1);
+    }
+    .jd-multi-row .jd-multi-name {
+      flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
+    }
+    .jd-multi-row .jd-multi-pos {
+      width: 3.4rem; padding: 0.18rem 0.3rem;
+      border: 1px solid var(--border); border-radius: 5px;
+      background: var(--bg); color: var(--text-1);
+      font-size: 0.78rem; text-align: center; flex-shrink: 0;
+    }
 
     /* Viewer */
     .viewer-panel {
@@ -658,7 +688,10 @@
         <div class="jd-item" data-jd-id="{{ jd.id }}" data-filled="{{ filled }}" data-positions="{{ jd.positions }}">
           <input type="checkbox" onchange="updateJDSelection()">
           <span class="jd-item-name">{{ jd.name }}</span>
+          <input type="number" class="jd-positions-edit" value="{{ jd.positions }}" min="1"
+                 title="Open positions" onchange="updateJdPositions(this)">
           <span class="jd-vacancy{% if filled >= jd.positions %} fulfilled{% endif %}">{% if filled >= jd.positions %}✓ Fulfilled{% else %}{{ filled }}/{{ jd.positions }}{% endif %}</span>
+          <button class="btn-view-jd" onclick="window.open('/jd/{{ jd.id }}/file','_blank')">View JD</button>
         </div>
         {% endfor %}
       </div>
@@ -681,6 +714,7 @@
         <div id="jd-file-name" style="display:none; margin-top:0.4rem;"></div>
         <input id="jd-file-input" type="file" accept=".pdf,.docx,.txt" multiple style="display:none">
       </div>
+      <div id="jd-multi-list" class="jd-multi-list" style="display:none"></div>
       <div id="jd-progress" style="display:none; margin-bottom:0.5rem;">
         <div class="progress-msg" id="jd-progress-phase">
           <span class="spinner"></span>
@@ -1081,11 +1115,32 @@ function updateJdVacancy(jdId, filled, positions) {
   if (!item) return;
   item.dataset.filled = filled;
   item.dataset.positions = positions;
+  const posInput = item.querySelector('.jd-positions-edit');
+  if (posInput && parseInt(posInput.value) !== positions) posInput.value = positions;
   const badge = item.querySelector('.jd-vacancy');
   if (!badge) return;
   const isFull = filled >= positions;
   badge.className = 'jd-vacancy' + (isFull ? ' fulfilled' : '');
   badge.textContent = isFull ? '✓ Fulfilled' : `${filled}/${positions}`;
+}
+
+async function updateJdPositions(input) {
+  const item  = input.closest('.jd-item');
+  const jdId  = item.dataset.jdId;
+  const val   = Math.max(1, parseInt(input.value) || 1);
+  input.value = val;
+  try {
+    const resp = await fetch(`/jd/${jdId}`, {
+      method: 'PATCH',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ positions: val }),
+    });
+    if (!resp.ok) throw new Error();
+    const data = await resp.json();
+    updateJdVacancy(jdId, data.filled, data.positions);
+  } catch(_) {
+    input.value = item.dataset.positions || 1;
+  }
 }
 
 // ── Theme toggle ──
@@ -1465,25 +1520,49 @@ async function deleteSelectedJDs() {
 }
 
 document.getElementById('jd-file-input').addEventListener('change', function() {
-  const files  = this.files;
-  const nameEl = document.getElementById('jd-file-name');
-  const prompt = document.getElementById('jd-drop-prompt');
-  const dropEl = document.getElementById('jd-file-drop');
-  const btn    = document.getElementById('jd-process-btn');
+  const files      = this.files;
+  const nameEl     = document.getElementById('jd-file-name');
+  const prompt     = document.getElementById('jd-drop-prompt');
+  const dropEl     = document.getElementById('jd-file-drop');
+  const btn        = document.getElementById('jd-process-btn');
+  const multiList  = document.getElementById('jd-multi-list');
+  const nameField  = document.getElementById('jd-name').closest('.field');
+  const posField   = document.getElementById('jd-positions').closest('.field');
+
   if (files && files.length > 0) {
-    nameEl.textContent = files.length === 1
-      ? files[0].name
-      : `${files.length} files selected`;
+    nameEl.textContent = files.length === 1 ? files[0].name : `${files.length} files selected`;
     nameEl.style.display = '';
     prompt.style.display = 'none';
     dropEl.classList.add('has-files');
     btn.disabled = false;
     btn.textContent = files.length > 1 ? `Add ${files.length} JDs` : 'Add JD';
+
+    if (files.length > 1) {
+      // Show per-file positions list; hide single-file name + positions fields
+      nameField.style.display = 'none';
+      posField.style.display  = 'none';
+      multiList.innerHTML = Array.from(files).map((f, i) => `
+        <div class="jd-multi-row">
+          <span class="jd-multi-name" title="${escHtml(f.name)}">${escHtml(f.name)}</span>
+          <label style="font-size:0.72rem;color:var(--text-2);flex-shrink:0;">Positions:</label>
+          <input type="number" class="jd-multi-pos" value="1" min="1" data-idx="${i}">
+        </div>`).join('');
+      multiList.style.display = '';
+    } else {
+      nameField.style.display = '';
+      posField.style.display  = '';
+      multiList.style.display = 'none';
+      multiList.innerHTML = '';
+    }
   } else {
     nameEl.style.display = 'none'; prompt.style.display = '';
     dropEl.classList.remove('has-files');
     btn.disabled = true;
     btn.textContent = 'Add JD';
+    nameField.style.display = '';
+    posField.style.display  = '';
+    multiList.style.display = 'none';
+    multiList.innerHTML = '';
   }
 });
 
@@ -1497,10 +1576,15 @@ document.getElementById('jd-form').addEventListener('submit', async function(e) 
   const barFill     = document.getElementById('jd-bar-fill');
   const countEl     = document.getElementById('jd-progress-count');
 
-  const files    = Array.from(document.getElementById('jd-file-input').files);
-  const nameVal  = document.getElementById('jd-name').value.trim();
-  const positions = parseInt(document.getElementById('jd-positions').value) || 1;
+  const files     = Array.from(document.getElementById('jd-file-input').files);
+  const nameVal   = document.getElementById('jd-name').value.trim();
   if (!files.length) return;
+
+  // Per-file positions: use multi-list inputs when >1 file, else single input
+  const multiRows = document.querySelectorAll('#jd-multi-list .jd-multi-pos');
+  const positionsArr = files.length > 1
+    ? Array.from(multiRows).map(el => parseInt(el.value) || 1)
+    : files.map(() => parseInt(document.getElementById('jd-positions').value) || 1);
 
   btn.disabled = true;
   resultEl.innerHTML = '';
@@ -1519,7 +1603,7 @@ document.getElementById('jd-form').addEventListener('submit', async function(e) 
     const fd = new FormData();
     fd.append('file', file);
     fd.append('name', files.length === 1 ? nameVal : (nameVal || ''));
-    fd.append('positions', positions);
+    fd.append('positions', positionsArr[fi]);
 
     // ── Step 1: create JD + extract requirements ──────────────────────────
     let jdData;
@@ -1627,7 +1711,7 @@ function addJdToDropdowns(jd_id, name, positions) {
     item.dataset.jdId = jd_id;
     item.dataset.filled = '0';
     item.dataset.positions = pos;
-    item.innerHTML = `<input type="checkbox" onchange="updateJDSelection()"><span class="jd-item-name">${escHtml(name)}</span><span class="jd-vacancy">0/${pos}</span>`;
+    item.innerHTML = `<input type="checkbox" onchange="updateJDSelection()"><span class="jd-item-name">${escHtml(name)}</span><input type="number" class="jd-positions-edit" value="${pos}" min="1" title="Open positions" onchange="updateJdPositions(this)"><span class="jd-vacancy">0/${pos}</span><button class="btn-view-jd" onclick="window.open('/jd/${jd_id}/file','_blank')">View JD</button>`;
     list.appendChild(item);
   }
   const countLabel = document.getElementById('jd-count-label');
