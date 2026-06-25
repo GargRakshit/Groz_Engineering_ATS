@@ -592,6 +592,17 @@
       flex: 1; min-width: 0;
       overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
     }
+    .jd-vacancy {
+      flex-shrink: 0;
+      font-size: 0.72rem; font-weight: 600;
+      padding: 0.1rem 0.45rem; border-radius: 20px;
+      background: var(--tag-bg); color: var(--text-2);
+      white-space: nowrap;
+    }
+    .jd-vacancy.fulfilled {
+      background: #16a34a22; color: #16a34a;
+    }
+    [data-theme="dark"] .jd-vacancy.fulfilled { color: #4ade80; background: #16a34a33; }
 
     /* Viewer */
     .viewer-panel {
@@ -643,9 +654,11 @@
       </div>
       <div id="jd-items-list" style="display:flex;flex-direction:column;gap:0.3rem;margin-bottom:1rem;">
         {% for jd in jds %}
-        <div class="jd-item" data-jd-id="{{ jd.id }}">
+        {% set filled = filled_by_jd.get(jd.id, 0) %}
+        <div class="jd-item" data-jd-id="{{ jd.id }}" data-filled="{{ filled }}" data-positions="{{ jd.positions }}">
           <input type="checkbox" onchange="updateJDSelection()">
           <span class="jd-item-name">{{ jd.name }}</span>
+          <span class="jd-vacancy{% if filled >= jd.positions %} fulfilled{% endif %}">{% if filled >= jd.positions %}✓ Fulfilled{% else %}{{ filled }}/{{ jd.positions }}{% endif %}</span>
         </div>
         {% endfor %}
       </div>
@@ -659,10 +672,14 @@
         <label>Name <span style="font-weight:400;text-transform:none;letter-spacing:0">(optional — defaults to filename)</span></label>
         <input type="text" id="jd-name" placeholder="e.g. Senior Backend Engineer">
       </div>
+      <div class="field">
+        <label>Positions <span style="font-weight:400;text-transform:none;letter-spacing:0">(how many to hire)</span></label>
+        <input type="number" id="jd-positions" value="1" min="1" style="width:6rem;">
+      </div>
       <div class="file-drop" id="jd-file-drop" onclick="document.getElementById('jd-file-input').click()">
         <div id="jd-drop-prompt">Drop PDF, DOCX, or TXT here, or <strong>click to browse</strong></div>
         <div id="jd-file-name" style="display:none; margin-top:0.4rem;"></div>
-        <input id="jd-file-input" type="file" accept=".pdf,.docx,.txt" style="display:none">
+        <input id="jd-file-input" type="file" accept=".pdf,.docx,.txt" multiple style="display:none">
       </div>
       <div id="jd-progress" style="display:none; margin-bottom:0.5rem;">
         <div class="progress-msg" id="jd-progress-phase">
@@ -894,7 +911,8 @@
       </span>
       <select class="status-select{% if r.status %} status-{{ r.status }}{% endif %}"
               data-resume-id="{{ r.id }}"
-              onchange="updateStatus(this)">
+              onchange="updateStatus(this)"
+              {% if not current_jd_id %}disabled title="Select a job description first"{% endif %}>
         <option value="">— Status —</option>
         <option value="shortlisted"{% if r.status == 'shortlisted' %} selected{% endif %}>Shortlisted</option>
         <option value="interviewed"{% if r.status == 'interviewed' %} selected{% endif %}>Interviewed</option>
@@ -985,8 +1003,10 @@ function buildCard(r) {
   const scoreText = score != null ? Math.round(score * 100) : '—';
   const url = `/resume/${r.id}${jdId?'?jd_id='+jdId:''}`;
 
-  const st = r.status || '';
+  const st = (entry && typeof entry === 'object' && entry.st) ? entry.st : (r.status || '');
   const stClass = st ? ` status-${st}` : '';
+  const stDisabled = jdId ? '' : ' disabled';
+  const stTitle = jdId ? '' : ' title="Select a job description first"';
   const stOpts = ['shortlisted','interviewed','selected','rejected']
     .map(v => `<option value="${v}"${st===v?' selected':''}>${v[0].toUpperCase()+v.slice(1)}</option>`)
     .join('');
@@ -1008,7 +1028,7 @@ function buildCard(r) {
   </div>
   <div class="cand-aside">
     <span class="score-val">${scoreText}</span>
-    <select class="status-select${stClass}" data-resume-id="${r.id}" onchange="updateStatus(this)">
+    <select class="status-select${stClass}" data-resume-id="${r.id}" onchange="updateStatus(this)"${stDisabled}${stTitle}>
       <option value="">\u2014 Status \u2014</option>
       ${stOpts}
     </select>
@@ -1028,20 +1048,44 @@ async function updateStatus(sel) {
   const card     = sel.closest('.cand-card');
   const resumeId = card.dataset.resumeId;
   const status   = sel.value || null;
+  const jdId     = document.getElementById('jd-filter').value;
+  if (!jdId) return;
 
+  const prevStatus = card.dataset.status || '';
   try {
     const resp = await fetch(`/resumes/${resumeId}/status`, {
       method: 'PATCH',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ status }),
+      body: JSON.stringify({ status, jd_id: parseInt(jdId) }),
     });
     if (!resp.ok) throw new Error('server error');
+    const data = await resp.json();
     card.dataset.status = status || '';
     sel.className = 'status-select' + (status ? ' status-' + status : '');
+    // Update the st field in data-scores for this JD
+    let scores = {};
+    try { scores = JSON.parse(card.dataset.scores || '{}'); } catch(_) {}
+    if (scores[jdId] && typeof scores[jdId] === 'object') {
+      scores[jdId].st = status;
+      card.dataset.scores = JSON.stringify(scores);
+    }
+    updateJdVacancy(jdId, data.filled, data.positions);
     applyFilters();
   } catch(_) {
-    sel.value = card.dataset.status || '';
+    sel.value = prevStatus;
   }
+}
+
+function updateJdVacancy(jdId, filled, positions) {
+  const item = document.querySelector(`#jd-items-list .jd-item[data-jd-id="${jdId}"]`);
+  if (!item) return;
+  item.dataset.filled = filled;
+  item.dataset.positions = positions;
+  const badge = item.querySelector('.jd-vacancy');
+  if (!badge) return;
+  const isFull = filled >= positions;
+  badge.className = 'jd-vacancy' + (isFull ? ' fulfilled' : '');
+  badge.textContent = isFull ? '✓ Fulfilled' : `${filled}/${positions}`;
 }
 
 // ── Theme toggle ──
@@ -1163,7 +1207,17 @@ function updateScores() {
         : `${(totYrs ?? relYrs).toFixed(1)} yrs exp`;
     }
 
-    // Bug 2: keep the report link in sync with the selected JD
+    // Sync status dropdown to per-JD status
+    const statusSel = card.querySelector('.status-select');
+    if (statusSel) {
+      const st = (entry && typeof entry === 'object' && entry.st) ? entry.st : '';
+      statusSel.value = st;
+      statusSel.className = 'status-select' + (st ? ' status-' + st : '');
+      statusSel.disabled = !jdId;
+      statusSel.title = jdId ? '' : 'Select a job description first';
+    }
+
+    // Keep the report link in sync with the selected JD
     const link = card.querySelector('.cand-name a');
     if (link) {
       const rid = card.dataset.resumeId;
@@ -1411,18 +1465,25 @@ async function deleteSelectedJDs() {
 }
 
 document.getElementById('jd-file-input').addEventListener('change', function() {
-  const name  = this.files[0]?.name;
+  const files  = this.files;
   const nameEl = document.getElementById('jd-file-name');
   const prompt = document.getElementById('jd-drop-prompt');
   const dropEl = document.getElementById('jd-file-drop');
-  if (name) {
-    nameEl.textContent = name; nameEl.style.display = '';
-    prompt.style.display = 'none'; dropEl.classList.add('has-files');
-    document.getElementById('jd-process-btn').disabled = false;
+  const btn    = document.getElementById('jd-process-btn');
+  if (files && files.length > 0) {
+    nameEl.textContent = files.length === 1
+      ? files[0].name
+      : `${files.length} files selected`;
+    nameEl.style.display = '';
+    prompt.style.display = 'none';
+    dropEl.classList.add('has-files');
+    btn.disabled = false;
+    btn.textContent = files.length > 1 ? `Add ${files.length} JDs` : 'Add JD';
   } else {
-    nameEl.style.display = ''; prompt.style.display = '';
+    nameEl.style.display = 'none'; prompt.style.display = '';
     dropEl.classList.remove('has-files');
-    document.getElementById('jd-process-btn').disabled = true;
+    btn.disabled = true;
+    btn.textContent = 'Add JD';
   }
 });
 
@@ -1431,120 +1492,127 @@ document.getElementById('jd-form').addEventListener('submit', async function(e) 
   const btn         = document.getElementById('jd-process-btn');
   const resultEl    = document.getElementById('jd-result');
   const progEl      = document.getElementById('jd-progress');
-  const phaseEl     = document.getElementById('jd-progress-phase');
   const labelEl     = document.getElementById('jd-progress-label');
   const scoreProgEl = document.getElementById('jd-score-progress');
   const barFill     = document.getElementById('jd-bar-fill');
   const countEl     = document.getElementById('jd-progress-count');
 
+  const files    = Array.from(document.getElementById('jd-file-input').files);
+  const nameVal  = document.getElementById('jd-name').value.trim();
+  const positions = parseInt(document.getElementById('jd-positions').value) || 1;
+  if (!files.length) return;
+
   btn.disabled = true;
   resultEl.innerHTML = '';
-  labelEl.textContent = 'Extracting requirements…';
-  scoreProgEl.style.display = 'none';
-  barFill.style.width = '0%';
   progEl.style.display = '';
 
-  const fd = new FormData();
-  fd.append('file', document.getElementById('jd-file-input').files[0]);
-  fd.append('name', document.getElementById('jd-name').value.trim());
+  let lastJdId = null;
 
-  // ── Step 1: create JD + extract requirements ────────────────────────────
-  let jdData;
-  try {
-    const resp = await fetch('/jd', { method: 'POST', body: fd });
-    jdData = await resp.json();
-  } catch(err) {
-    resultEl.innerHTML = `<div class="upload-result err">✗ Failed: ${escHtml(String(err))}</div>`;
-    progEl.style.display = 'none';
-    btn.disabled = false;
-    return;
-  }
+  for (let fi = 0; fi < files.length; fi++) {
+    const file = files[fi];
+    const fileLabel = files.length > 1 ? ` (${fi+1}/${files.length})` : '';
 
-  if (jdData.error) {
-    resultEl.innerHTML = `<div class="upload-result err">✗ ${escHtml(jdData.error)}</div>`;
-    progEl.style.display = 'none';
-    btn.disabled = false;
-    return;
-  }
+    labelEl.textContent = `Extracting requirements…${fileLabel}`;
+    scoreProgEl.style.display = 'none';
+    barFill.style.width = '0%';
 
-  addJdToDropdowns(jdData.jd_id, jdData.name);
+    const fd = new FormData();
+    fd.append('file', file);
+    fd.append('name', files.length === 1 ? nameVal : (nameVal || ''));
+    fd.append('positions', positions);
 
-  const total = jdData.resume_count || 0;
-  if (total === 0) {
-    resultEl.innerHTML = `<div class="upload-result ok">✓ <strong>${escHtml(jdData.name)}</strong> added · no resumes to score</div>`;
-    progEl.style.display = 'none';
-    btn.disabled = false;
-    return;
-  }
+    // ── Step 1: create JD + extract requirements ──────────────────────────
+    let jdData;
+    try {
+      const resp = await fetch('/jd', { method: 'POST', body: fd });
+      jdData = await resp.json();
+    } catch(err) {
+      resultEl.innerHTML += `<div class="upload-result err">✗ ${escHtml(file.name)}: ${escHtml(String(err))}</div>`;
+      continue;
+    }
 
-  // ── Step 2: stream scoring progress via SSE ─────────────────────────────
-  labelEl.textContent = `Scoring resumes…`;
-  scoreProgEl.style.display = 'flex';
-  countEl.textContent = `0 / ${total}`;
+    if (jdData.error) {
+      resultEl.innerHTML += `<div class="upload-result err">✗ ${escHtml(file.name)}: ${escHtml(jdData.error)}</div>`;
+      continue;
+    }
 
-  await new Promise(resolve => {
-    const source = new EventSource(`/jd/${jdData.jd_id}/score-stream`);
-    let done = 0;
+    addJdToDropdowns(jdData.jd_id, jdData.name, jdData.positions);
+    lastJdId = jdData.jd_id;
 
-    source.onmessage = ev => {
-      let d;
-      try { d = JSON.parse(ev.data); } catch(_) { return; }
+    const total = jdData.resume_count || 0;
+    if (total === 0) {
+      resultEl.innerHTML += `<div class="upload-result ok">✓ <strong>${escHtml(jdData.name)}</strong> added · no resumes to score</div>`;
+      continue;
+    }
 
-      if (d.error) {
-        source.close();
-        resultEl.innerHTML = `<div class="upload-result err">✗ Scoring error: ${escHtml(d.error)}</div>`;
-        resolve();
-        return;
-      }
+    // ── Step 2: stream scoring progress via SSE ───────────────────────────
+    labelEl.textContent = `Scoring resumes…${fileLabel}`;
+    scoreProgEl.style.display = 'flex';
+    countEl.textContent = `0 / ${total}`;
 
-      // Update card's data-scores in real-time (fixes Bug 1: scores no longer show "—")
-      if (d.resume_id != null && d.score != null) {
-        const card = document.querySelector(`.cand-card[data-resume-id="${d.resume_id}"]`);
-        if (card) {
-          let sc = {};
-          try { sc = JSON.parse(card.dataset.scores || '{}'); } catch(_) {}
-          sc[String(jdData.jd_id)] = {s: d.score, ry: d.ry ?? null, ty: d.ty ?? null};
-          card.dataset.scores = JSON.stringify(sc);
+    await new Promise(resolve => {
+      const source = new EventSource(`/jd/${jdData.jd_id}/score-stream`);
+      let done = 0;
+
+      source.onmessage = ev => {
+        let d;
+        try { d = JSON.parse(ev.data); } catch(_) { return; }
+
+        if (d.error) {
+          source.close();
+          resultEl.innerHTML += `<div class="upload-result err">✗ Scoring error: ${escHtml(d.error)}</div>`;
+          resolve();
+          return;
         }
-      }
 
-      if (d.done != null) {
-        done = d.done;
-        const t = d.total || total;
-        barFill.style.width = `${Math.round(done / t * 100)}%`;
-        countEl.textContent = `${done} / ${t}`;
-      }
+        if (d.resume_id != null && d.score != null) {
+          const card = document.querySelector(`.cand-card[data-resume-id="${d.resume_id}"]`);
+          if (card) {
+            let sc = {};
+            try { sc = JSON.parse(card.dataset.scores || '{}'); } catch(_) {}
+            sc[String(jdData.jd_id)] = {s: d.score, ry: d.ry ?? null, ty: d.ty ?? null, st: null};
+            card.dataset.scores = JSON.stringify(sc);
+          }
+        }
 
-      if (d.complete) {
+        if (d.done != null) {
+          done = d.done;
+          const t = d.total || total;
+          barFill.style.width = `${Math.round(done / t * 100)}%`;
+          countEl.textContent = `${done} / ${t}`;
+        }
+
+        if (d.complete) {
+          source.close();
+          const n = done;
+          resultEl.innerHTML += `<div class="upload-result ok">✓ <strong>${escHtml(jdData.name)}</strong> added · ${n} resume${n!==1?'s':''} scored</div>`;
+          resolve();
+        }
+      };
+
+      source.onerror = () => {
         source.close();
         const n = done;
-        resultEl.innerHTML = `<div class="upload-result ok">✓ <strong>${escHtml(jdData.name)}</strong> added · ${n} resume${n!==1?'s':''} scored</div>`;
-        // Auto-select new JD and show scores
-        const sel = document.getElementById('jd-filter');
-        if (sel) { sel.value = String(jdData.jd_id); updateScores(); }
-        resolve();
-      }
-    };
-
-    source.onerror = () => {
-      source.close();
-      if (!resultEl.innerHTML) {
-        const n = done;
-        resultEl.innerHTML = `<div class="upload-result ok">✓ <strong>${escHtml(jdData.name)}</strong> added · ${n} resume${n!==1?'s':''} scored</div>`;
-        if (n > 0) {
-          const sel = document.getElementById('jd-filter');
-          if (sel) { sel.value = String(jdData.jd_id); updateScores(); }
+        if (n > 0 || !resultEl.innerHTML.includes(escHtml(jdData.name))) {
+          resultEl.innerHTML += `<div class="upload-result ok">✓ <strong>${escHtml(jdData.name)}</strong> added · ${n} resume${n!==1?'s':''} scored</div>`;
         }
-      }
-      resolve();
-    };
-  });
+        resolve();
+      };
+    });
+  }
 
   progEl.style.display = 'none';
   btn.disabled = false;
+  btn.textContent = 'Add JD';
+
+  // Auto-select the last added JD
+  if (lastJdId) {
+    const sel = document.getElementById('jd-filter');
+    if (sel) { sel.value = String(lastJdId); updateScores(); }
+  }
 });
 
-function addJdToDropdowns(jd_id, name) {
+function addJdToDropdowns(jd_id, name, positions) {
   const sel = document.getElementById('jd-filter');
   if (sel) sel.add(new Option(name, jd_id));
 
@@ -1553,10 +1621,13 @@ function addJdToDropdowns(jd_id, name) {
   if (section) section.style.display = '';
   const list = document.getElementById('jd-items-list');
   if (list) {
+    const pos = positions || 1;
     const item = document.createElement('div');
     item.className = 'jd-item';
     item.dataset.jdId = jd_id;
-    item.innerHTML = `<input type="checkbox" onchange="updateJDSelection()"><span class="jd-item-name">${escHtml(name)}</span>`;
+    item.dataset.filled = '0';
+    item.dataset.positions = pos;
+    item.innerHTML = `<input type="checkbox" onchange="updateJDSelection()"><span class="jd-item-name">${escHtml(name)}</span><span class="jd-vacancy">0/${pos}</span>`;
     list.appendChild(item);
   }
   const countLabel = document.getElementById('jd-count-label');

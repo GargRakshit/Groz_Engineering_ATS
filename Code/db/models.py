@@ -28,6 +28,7 @@ class JobDescription(Base):
     name: Mapped[str] = mapped_column(String(255), nullable=False)
     file_path: Mapped[str] = mapped_column(String(512), unique=True, nullable=False)
     requirements_json: Mapped[Optional[str]] = mapped_column(Text, nullable=True)
+    positions: Mapped[int] = mapped_column(Integer, default=1, nullable=False)
     created_at: Mapped[datetime] = mapped_column(DateTime, default=datetime.utcnow, nullable=False)
 
     matches: Mapped[list[Match]] = relationship("Match", back_populates="job_description", cascade="all, delete-orphan")
@@ -95,6 +96,7 @@ class Match(Base):
     score_breakdown_json: Mapped[Optional[str]] = mapped_column(Text, nullable=True)
     matched_skills_json: Mapped[Optional[str]] = mapped_column(Text, nullable=True)
     missing_skills_json: Mapped[Optional[str]] = mapped_column(Text, nullable=True)
+    status: Mapped[Optional[str]] = mapped_column(String(32), nullable=True)
     created_at: Mapped[datetime] = mapped_column(DateTime, default=datetime.utcnow, nullable=False)
 
     resume: Mapped[Resume] = relationship("Resume", back_populates="matches")

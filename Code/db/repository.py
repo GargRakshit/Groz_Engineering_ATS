@@ -57,18 +57,33 @@ def save_jd(
     name: str,
     file_path: str,
     requirements: Optional[JDRequirements] = None,
+    positions: int = 1,
 ) -> JobDescription:
     jd = session.query(JobDescription).filter_by(file_path=file_path).first()
     req_json = requirements.model_dump_json() if requirements else None
     if jd is None:
-        jd = JobDescription(name=name, file_path=file_path, requirements_json=req_json)
+        jd = JobDescription(name=name, file_path=file_path, requirements_json=req_json,
+                            positions=max(1, int(positions)))
         session.add(jd)
     else:
         jd.name = name
         jd.requirements_json = req_json
+        jd.positions = max(1, int(positions))
     session.commit()
     session.refresh(jd)
     return jd
+
+
+def get_jd_filled_counts(session: Session) -> dict[int, int]:
+    """Return {jd_id: count_of_selected_candidates} for all JDs."""
+    from sqlalchemy import func
+    rows = (
+        session.query(Match.jd_id, func.count(Match.id))
+        .filter(Match.status == "selected")
+        .group_by(Match.jd_id)
+        .all()
+    )
+    return {jd_id: count for jd_id, count in rows}
 
 
 # ---------------------------------------------------------------------------
@@ -170,6 +185,29 @@ def save_resume(
 def get_all_jds(session: Session) -> list[JobDescription]:
     """Return all job descriptions ordered by most recently created."""
     return session.query(JobDescription).order_by(JobDescription.created_at.desc()).all()
+
+
+def update_match_status(
+    session: Session, resume_id: int, jd_id: int, status: Optional[str]
+) -> Optional[dict]:
+    """Update the per-JD status on a Match row.
+
+    Returns {filled, positions} for the JD so the caller can update the
+    vacancy display, or None if the match row doesn't exist.
+    """
+    from sqlalchemy import func
+    match = session.query(Match).filter_by(resume_id=resume_id, jd_id=jd_id).first()
+    if match is None:
+        return None
+    match.status = status
+    session.commit()
+    jd = session.query(JobDescription).filter_by(id=jd_id).first()
+    filled = (
+        session.query(func.count(Match.id))
+        .filter(Match.jd_id == jd_id, Match.status == "selected")
+        .scalar()
+    ) or 0
+    return {"filled": filled, "positions": jd.positions if jd else 1}
 
 
 def get_resume_by_id(
@@ -279,7 +317,7 @@ def search_resumes(
             "score_breakdown": breakdown,
             "skills_list": skills_list,
             "match_jd_id": best_match.jd_id if best_match else None,
-            "status": r.status,
+            "status": best_match.status if best_match else None,
         })
 
     results.sort(key=lambda x: (x["ats_score"] or 0.0), reverse=True)

@@ -25,10 +25,12 @@ from Code.db.models import JobDescription, Match, Resume
 from Code.db.repository import (
     get_all_jds,
     get_candidates_for_dedup,
+    get_jd_filled_counts,
     get_resume_by_id,
     save_jd,
     save_resume,
     search_resumes,
+    update_match_status,
 )
 from Code.db.models import User
 from Code.db.session import check_password, get_db, init_db
@@ -274,10 +276,12 @@ async def logout(request: Request) -> RedirectResponse:
 async def index(request: Request, jd_id: Optional[int] = None) -> HTMLResponse:
     with get_db() as session:
         jds = get_all_jds(session)
+        filled_by_jd = get_jd_filled_counts(session)
         results = _load_results(session, jd_id)
 
     return templates.TemplateResponse(request, "index.html", {
         "jds": jds,
+        "filled_by_jd": filled_by_jd,
         "results": results,
         "current_jd_id": jd_id,
     })
@@ -301,6 +305,7 @@ def _load_results(session, jd_id: Optional[int], ids: Optional[list[int]] = None
                 "s": round(m.ats_score, 4),
                 "ry": bd.get("relevant_years"),
                 "ty": bd.get("years_experience"),
+                "st": m.status,
             }
 
         for r in results:
@@ -361,6 +366,7 @@ _VALID_STATUSES = {None, "shortlisted", "interviewed", "selected", "rejected"}
 
 class StatusUpdate(BaseModel):
     status: Optional[str] = None
+    jd_id: int
 
 
 @app.patch("/resumes/{resume_id}/status")
@@ -368,12 +374,10 @@ async def update_resume_status(resume_id: int, body: StatusUpdate) -> JSONRespon
     if body.status not in _VALID_STATUSES:
         return JSONResponse({"error": "invalid status"}, status_code=400)
     with get_db() as session:
-        resume = session.query(Resume).filter_by(id=resume_id).first()
-        if not resume:
-            return JSONResponse({"error": "not found"}, status_code=404)
-        resume.status = body.status
-        session.commit()
-    return JSONResponse({"status": body.status})
+        result = update_match_status(session, resume_id, body.jd_id, body.status)
+    if result is None:
+        return JSONResponse({"error": "match not found"}, status_code=404)
+    return JSONResponse({"status": body.status, **result})
 
 
 @app.post("/upload")
@@ -620,6 +624,7 @@ async def rescore_resumes(req: _RescoreRequest) -> JSONResponse:
 async def add_jd(
     file: UploadFile = File(...),
     name: str = Form(""),
+    positions: int = Form(1),
 ) -> JSONResponse:
     """Create a JD record and extract requirements. Scoring is streamed separately
     via GET /jd/{jd_id}/score-stream so the client can show a progress bar."""
@@ -648,8 +653,10 @@ async def add_jd(
         jd_reqs = None
 
     with get_db() as session:
-        jd_row = save_jd(session, name=jd_name, file_path=str(dest), requirements=jd_reqs)
+        jd_row = save_jd(session, name=jd_name, file_path=str(dest), requirements=jd_reqs,
+                         positions=max(1, positions))
         jd_id = jd_row.id
+        jd_positions = jd_row.positions
 
     cutoff = datetime.utcnow() - timedelta(days=183)
     with get_db() as session:
@@ -660,7 +667,7 @@ async def add_jd(
         )
 
     return JSONResponse(content={
-        "jd_id": jd_id, "name": jd_name, "resume_count": resume_count,
+        "jd_id": jd_id, "name": jd_name, "positions": jd_positions, "resume_count": resume_count,
     })
 
 

@@ -51,12 +51,30 @@ def _ensure_columns() -> None:
     ones, so new columns on a pre-existing table must be added explicitly.
     """
     inspector = inspect(engine)
-    if "resume" not in inspector.get_table_names():
+    tables = set(inspector.get_table_names())
+    if "resume" not in tables:
         return
-    existing = {c["name"] for c in inspector.get_columns("resume")}
-    if "lex_tokens_json" not in existing:
+
+    resume_cols = {c["name"] for c in inspector.get_columns("resume")}
+    if "lex_tokens_json" not in resume_cols:
         with engine.begin() as conn:
             conn.execute(text("ALTER TABLE resume ADD COLUMN lex_tokens_json TEXT"))
+
+    if "job_description" in tables:
+        jd_cols = {c["name"] for c in inspector.get_columns("job_description")}
+        if "positions" not in jd_cols:
+            with engine.begin() as conn:
+                conn.execute(text(
+                    "ALTER TABLE job_description ADD COLUMN positions INT NOT NULL DEFAULT 1"
+                ))
+
+    if "match" in tables:
+        match_cols = {c["name"] for c in inspector.get_columns("match")}
+        if "status" not in match_cols:
+            with engine.begin() as conn:
+                conn.execute(text(
+                    "ALTER TABLE `match` ADD COLUMN status VARCHAR(32) NULL"
+                ))
 
 
 def init_db() -> None:
