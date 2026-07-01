@@ -6,21 +6,9 @@ A self-hosted applicant tracking system that parses resumes and job descriptions
 
 ---
 
-## Work in Progress
+## Design
 
-This project was built in stages, moving progressively away from LLM-heavy processing toward fully deterministic, API-free scoring.
-
-**Where it started:** The original system had the LLM do everything — extract resume data, match skills, score candidates, and justify the match. This was fast to build but non-deterministic, expensive, and hard to audit.
-
-**Where it is now:** The LLM is responsible for extraction only — one call per resume, one call per job description. All matching, scoring, and ranking is done in Python with a per-phrase Cross-Encoder pipeline that produces deterministic results.
-
-**Where it is going:** Eliminate the LLM dependency for extraction too, replacing it with a local pipeline. The goal is a system that works fully offline with zero API calls.
-
-| Stage | Status | What the LLM does |
-|---|---|---|
-| 1 — LLM does everything | ✅ Done (legacy, deleted) | Extract + match + score |
-| 2 — LLM does extraction only | ✅ Current | Extract structured data from text |
-| 3 — Local NLP extraction | 🔲 Planned | Nothing — fully offline |
+The system splits responsibilities cleanly between the LLM and the code: the LLM is used **only** for structured extraction — one call per resume, one call per job description (cached by SHA-256, so a JD is never re-sent to the LLM). All matching, scoring, and ranking is done in pure Python via a per-phrase Cross-Encoder pipeline, so results are deterministic, explainable, and reproducible across runs — the same resume/JD pair always produces the same score.
 
 ---
 

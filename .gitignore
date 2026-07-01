@@ -36,6 +36,9 @@ Output/
 # ── Local models (large binary files — download separately) ───────────────
 models/
 
+# ── Documents / reports ───────────────────────────────────────────────────
+DocWork/
+
 # ── OS / editor ───────────────────────────────────────────────────────────
 .DS_Store
 Thumbs.db
