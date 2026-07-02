@@ -37,7 +37,11 @@ Output/
 models/
 
 # ── Documents / reports ───────────────────────────────────────────────────
-DocWork/
+# Everything in DocWork/ is ignored by default (internal reports, cost
+# estimates, etc.) except the two files explicitly un-ignored below.
+DocWork/*
+!DocWork/DOCUMENTATION.docx
+!DocWork/HANDOVER.docx
 
 # ── OS / editor ───────────────────────────────────────────────────────────
 .DS_Store
